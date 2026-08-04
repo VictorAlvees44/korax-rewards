@@ -42,7 +42,7 @@ window.CONFIG_PADRAO = {
     voltasMinimas: 6
   },
   webhook: {
-    url: ""
+    url: "https://script.google.com/macros/s/AKfycbztoFQ0_IT3JV5HJC8ixhmGbEyNi8Kt5oRZoNdkpuPkwOxTxvfytoW1wFkkQFDvVzWZ/exec"
   },
   premios: [
     { id: "p1", nome: "Chocolate", cor: "#C9A227", categoria: "Brinde", descricao: "Um chocolate para adoçar o dia", positivo: true, som: "" },
