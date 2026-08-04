@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Roleta da Sorte Corporativa</title>
+<meta name="description" content="Roleta da sorte corporativa para campanhas comerciais e eventos">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Poppins:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ======================= TELA PRINCIPAL DA ROLETA ======================= -->
+<section id="palco" class="palco">
+
+  <div class="palco__fundo" id="fundoPersonalizado" aria-hidden="true"></div>
+
+  <header class="topo">
+    <img id="logoEmpresa" class="topo__logo" src="assets/logo/logo.png" alt="Logo da empresa" onerror="this.style.display='none'">
+    <h1 class="topo__titulo" id="topoTitulo">Roleta da Sorte</h1>
+    <button id="btnTelaCheia" class="botao-icone" title="Tela cheia" aria-label="Alternar tela cheia">⛶</button>
+  </header>
+
+  <div class="arena">
+    <div class="arena__roleta-wrap">
+      <div class="ponteiro" aria-hidden="true"></div>
+      <canvas id="canvasRoleta" width="640" height="640" aria-label="Roleta de prêmios"></canvas>
+      <div class="cubo-central" id="cuboCentral">
+        <img id="logoCentral" class="cubo-central__logo oculto" alt="Logo da empresa">
+        <span id="textoCentral">GIRAR</span>
+      </div>
+    </div>
+
+    <button id="btnGirar" class="botao-principal">
+      GIRAR ROLETA
+    </button>
+  </div>
+</section>
+
+<!-- ======================= MODAL: NOME DO PARTICIPANTE ======================= -->
+<div id="modalNome" class="modal oculto" role="dialog" aria-modal="true" aria-labelledby="modalNomeTitulo">
+  <div class="modal__caixa">
+    <h2 id="modalNomeTitulo">Antes de girar...</h2>
+    <p>Informe o nome do participante para registrar o resultado.</p>
+    <label for="inputNomeParticipante" class="rotulo">Nome do participante</label>
+    <input id="inputNomeParticipante" class="campo" type="text" maxlength="60" placeholder="Ex: Maria Silva" autocomplete="off">
+    <p id="erroNome" class="erro oculto">Digite um nome para continuar.</p>
+    <div class="modal__acoes">
+      <button id="btnCancelarGiro" class="botao-secundario">Cancelar</button>
+      <button id="btnConfirmarGiro" class="botao-principal">Girar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= MODAL: RESULTADO ======================= -->
+<div id="modalResultado" class="modal oculto" role="dialog" aria-modal="true" aria-labelledby="modalResultadoTitulo">
+  <div class="modal__caixa modal__caixa--resultado">
+    <div id="resultadoSelo" class="resultado-selo"></div>
+    <h2 id="modalResultadoTitulo">Resultado</h2>
+    <p id="resultadoNome" class="resultado-nome"></p>
+    <p id="resultadoPremio" class="resultado-premio"></p>
+    <p id="resultadoStatus" class="resultado-status"></p>
+    <button id="btnFecharResultado" class="botao-principal">Fechar</button>
+  </div>
+</div>
+
+<canvas id="canvasConfete" class="canvas-confete" aria-hidden="true"></canvas>
+
+<div id="avisoToast" class="toast oculto"></div>
+
+<audio id="audioGiro" loop></audio>
+<audio id="audioVitoria"></audio>
+<audio id="audioDerrota"></audio>
+<audio id="audioClique"></audio>
+<audio id="audioParada"></audio>
+
+<script src="config.js"></script>
+<script src="roleta-app.js" type="module"></script>
+</body>
+</html>

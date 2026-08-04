@@ -1,0 +1,15 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.swp
+
+# Backups locais de configuração exportada (aba Configurações > Exportar JSON)
+perfil-*.json
+*.local.json
+
+# Compactados que às vezes ficam soltos na pasta por engano
+*.zip

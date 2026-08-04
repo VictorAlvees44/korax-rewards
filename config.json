@@ -1,0 +1,33 @@
+{
+  "empresa": {
+    "nome": "Sua Empresa",
+    "tituloRoleta": "Roleta da Sorte",
+    "logoUrl": "assets/logo/logo.png",
+    "planoFundoUrl": "",
+    "corPrimaria": "#C9A227",
+    "corSecundaria": "#0B1220",
+    "fonte": "Sora"
+  },
+  "sons": {
+    "giro": "assets/musicas/giro.mp3",
+    "vitoria": "assets/musicas/vitoria.mp3",
+    "derrota": "assets/musicas/derrota.mp3",
+    "clique": "assets/musicas/clique.mp3",
+    "parada": "assets/musicas/parada.mp3"
+  },
+  "roleta": {
+    "duracaoGiroMs": 4800,
+    "voltasMinimas": 6
+  },
+  "webhook": {
+    "url": ""
+  },
+  "premios": [
+    { "id": "p1", "nome": "Chocolate", "cor": "#C9A227", "categoria": "Brinde", "descricao": "Um chocolate para adoçar o dia", "positivo": true, "som": "" },
+    { "id": "p2", "nome": "Vale Café", "cor": "#2E7D32", "categoria": "Brinde", "descricao": "Um café por conta da casa", "positivo": true, "som": "" },
+    { "id": "p3", "nome": "Vale Folga", "cor": "#8E44AD", "categoria": "Premio Maior", "descricao": "Uma folga merecida", "positivo": true, "som": "" },
+    { "id": "p4", "nome": "Quase Lá", "cor": "#7F8C8D", "categoria": "Neutro", "descricao": "Não foi essa vez", "positivo": false, "som": "" },
+    { "id": "p5", "nome": "Vale Lanche", "cor": "#2980B9", "categoria": "Brinde", "descricao": "Um lanche por nossa conta", "positivo": true, "som": "" },
+    { "id": "p6", "nome": "Tente Outra Vez", "cor": "#C0392B", "categoria": "Neutro", "descricao": "Na próxima você acerta", "positivo": false, "som": "" }
+  ]
+}

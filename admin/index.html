@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Roleta da Sorte Corporativa</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Poppins:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<section class="painel">
+  <div class="painel__cabecalho painel__cabecalho--admin">
+    <div>
+      <h2>Painel Administrativo</h2>
+      <p>
+        Perfil em edição: <strong id="rotuloPerfilAtual">novo perfil (não salvo)</strong>
+        <span id="seloPerfilAtivoTopo" class="cartao-perfil__selo oculto">ATIVO NA ROLETA</span>
+      </p>
+    </div>
+    <a href="../index.html" class="botao-secundario" target="_blank" rel="noopener">Ver roleta pública ↗</a>
+  </div>
+
+  <div class="painel__dica painel__dica--aviso">
+    Esta página não tem senha — qualquer pessoa com o link pode acessá-la e editar os perfis.
+    Evite compartilhar o link de <code>/admin</code> com quem não deve ter acesso.
+  </div>
+
+  <nav class="painel__abas" role="tablist">
+    <button class="aba ativa" data-aba="premios" role="tab" aria-selected="true">Prêmios</button>
+    <button class="aba" data-aba="visual" role="tab" aria-selected="false">Visual</button>
+    <button class="aba" data-aba="sons" role="tab" aria-selected="false">Sons</button>
+    <button class="aba" data-aba="perfis" role="tab" aria-selected="false">Perfis</button>
+    <button class="aba" data-aba="config" role="tab" aria-selected="false">Configurações</button>
+    <button class="aba" data-aba="historico" role="tab" aria-selected="false">Histórico</button>
+    <button class="aba" data-aba="estatisticas" role="tab" aria-selected="false">Estatísticas</button>
+  </nav>
+
+  <!-- PRÉVIA DA ROLETA (sempre visível, reflete o que está sendo editado) -->
+  <div class="previa-admin">
+    <div class="previa-admin__roleta">
+      <canvas id="canvasRoleta" width="360" height="360" aria-label="Prévia da roleta"></canvas>
+    </div>
+    <div class="previa-admin__acoes">
+      <button id="btnTestarGiro" class="botao-secundario">🎲 Testar giro (não registra)</button>
+      <button id="btnAtivarPerfil" class="botao-principal">🚀 Publicar este layout na roleta pública</button>
+    </div>
+  </div>
+
+  <!-- ABA PREMIOS -->
+  <div class="painel__conteudo" data-conteudo="premios">
+    <div class="painel__acoes-topo">
+      <button id="btnAdicionarPremio" class="botao-secundario">+ Adicionar prêmio (cor sorteada automaticamente)</button>
+    </div>
+    <div id="listaPremios" class="lista-premios"></div>
+  </div>
+
+  <!-- ABA VISUAL -->
+  <div class="painel__conteudo oculto" data-conteudo="visual">
+    <div class="grade-form">
+      <div class="campo-grupo">
+        <label for="inputNomeEmpresa">Nome da empresa</label>
+        <input id="inputNomeEmpresa" class="campo" type="text">
+      </div>
+      <div class="campo-grupo">
+        <label for="inputTituloRoleta">Nome/título desta roleta</label>
+        <input id="inputTituloRoleta" class="campo" type="text" placeholder="Ex: Roleta Feira Cliente A">
+      </div>
+      <div class="campo-grupo">
+        <label for="inputLogoUpload">Logo (upload)</label>
+        <input id="inputLogoUpload" class="campo" type="file" accept="image/*">
+      </div>
+      <div class="campo-grupo">
+        <label for="inputFundoUpload">Plano de fundo (upload)</label>
+        <input id="inputFundoUpload" class="campo" type="file" accept="image/*">
+      </div>
+      <div class="campo-grupo">
+        <label for="inputCorPrimaria">Cor primária</label>
+        <input id="inputCorPrimaria" class="campo campo-cor" type="color">
+      </div>
+      <div class="campo-grupo">
+        <label for="inputCorSecundaria">Cor secundária</label>
+        <input id="inputCorSecundaria" class="campo campo-cor" type="color">
+      </div>
+      <div class="campo-grupo">
+        <label for="selectFonte">Fonte</label>
+        <select id="selectFonte" class="campo">
+          <option value="Sora">Sora</option>
+          <option value="Inter">Inter</option>
+          <option value="Poppins">Poppins</option>
+          <option value="Montserrat">Montserrat</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA SONS -->
+  <div class="painel__conteudo oculto" data-conteudo="sons">
+    <div class="grade-form">
+      <div class="campo-grupo">
+        <label for="uploadSomGiro">Som durante o giro</label>
+        <input id="uploadSomGiro" class="campo" type="file" accept="audio/*">
+      </div>
+      <div class="campo-grupo">
+        <label for="uploadSomVitoria">Som de vitória</label>
+        <input id="uploadSomVitoria" class="campo" type="file" accept="audio/*">
+      </div>
+      <div class="campo-grupo">
+        <label for="uploadSomDerrota">Som de derrota</label>
+        <input id="uploadSomDerrota" class="campo" type="file" accept="audio/*">
+      </div>
+      <div class="campo-grupo">
+        <label for="uploadSomClique">Som de clique</label>
+        <input id="uploadSomClique" class="campo" type="file" accept="audio/*">
+      </div>
+      <div class="campo-grupo">
+        <label for="uploadSomParada">Som de parada</label>
+        <input id="uploadSomParada" class="campo" type="file" accept="audio/*">
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA PERFIS -->
+  <div class="painel__conteudo oculto" data-conteudo="perfis">
+    <p class="painel__dica">
+      Os perfis abaixo ficam salvos no backend (não neste navegador), então
+      qualquer computador ou tablet que abrir esta página de admin — ou a
+      roleta pública — vê os mesmos dados. "Salvar" grava o layout na
+      biblioteca. "Publicar" é o botão acima: torna este layout o que a
+      roleta pública exibe agora.
+    </p>
+    <div class="painel__acoes-topo">
+      <input id="inputNomeNovoPerfil" class="campo campo-perfil" type="text" placeholder="Nome do perfil (ex: Feira Cliente A)">
+      <button id="btnSalvarNovoPerfil" class="botao-principal">Salvar layout atual como perfil</button>
+    </div>
+    <div id="listaPerfis" class="lista-perfis"></div>
+  </div>
+
+  <!-- ABA CONFIGURACOES -->
+  <div class="painel__conteudo oculto" data-conteudo="config">
+    <div class="painel__dica">
+      A URL do Web App abaixo é apenas para <strong>testes neste navegador</strong>.
+      Para que a roleta pública e o admin funcionem em qualquer dispositivo,
+      configure a URL definitiva direto no arquivo <code>config.js</code> do
+      projeto (campo <code>webhook.url</code>) e publique no GitHub Pages.
+    </div>
+    <div class="grade-form">
+      <div class="campo-grupo">
+        <label for="inputUrlWebhook">URL do Web App (Google Apps Script)</label>
+        <input id="inputUrlWebhook" class="campo" type="text" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <div class="campo-grupo">
+        <label for="inputDuracaoGiro">Duração do giro (segundos)</label>
+        <input id="inputDuracaoGiro" class="campo" type="number" min="2" max="15" step="0.1">
+      </div>
+      <div class="campo-grupo">
+        <label for="inputVoltasMinimas">Voltas mínimas</label>
+        <input id="inputVoltasMinimas" class="campo" type="number" min="2" max="20" step="1">
+      </div>
+    </div>
+    <div class="painel__acoes-topo">
+      <button id="btnExportarJson" class="botao-secundario">Exportar JSON deste perfil</button>
+      <label class="botao-secundario botao-arquivo">
+        Importar JSON
+        <input id="inputImportarJson" type="file" accept="application/json" hidden>
+      </label>
+    </div>
+  </div>
+
+  <!-- ABA HISTORICO -->
+  <div class="painel__conteudo oculto" data-conteudo="historico">
+    <p class="painel__dica">
+      Este histórico é apenas um espelho local (deste navegador) dos últimos
+      giros, para consulta rápida durante o evento. O registro oficial e
+      completo, separado por layout e por mês, fica na planilha do Google
+      Sheets vinculada ao backend.
+    </p>
+    <table class="tabela">
+      <thead>
+        <tr><th>Nome</th><th>Prêmio</th><th>Perfil</th><th>Data</th><th>Hora</th></tr>
+      </thead>
+      <tbody id="corpoHistorico"></tbody>
+    </table>
+  </div>
+
+  <!-- ABA ESTATISTICAS -->
+  <div class="painel__conteudo oculto" data-conteudo="estatisticas">
+    <div class="grade-estatisticas">
+      <div class="cartao-estat">
+        <span class="cartao-estat__valor" id="estatTotalGiros">0</span>
+        <span class="cartao-estat__rotulo">Giros realizados (neste navegador)</span>
+      </div>
+      <div class="cartao-estat">
+        <span class="cartao-estat__valor" id="estatMaisSorteado">-</span>
+        <span class="cartao-estat__rotulo">Prêmio mais sorteado</span>
+      </div>
+      <div class="cartao-estat">
+        <span class="cartao-estat__valor" id="estatMenosSorteado">-</span>
+        <span class="cartao-estat__rotulo">Prêmio menos sorteado</span>
+      </div>
+    </div>
+    <canvas id="canvasGrafico" class="grafico" height="220"></canvas>
+  </div>
+</section>
+
+<div id="avisoToast" class="toast oculto"></div>
+
+<audio id="audioGiro" loop></audio>
+<audio id="audioVitoria"></audio>
+<audio id="audioDerrota"></audio>
+<audio id="audioClique"></audio>
+<audio id="audioParada"></audio>
+
+<script src="../config.js"></script>
+<script src="admin-app.js" type="module"></script>
+</body>
+</html>
