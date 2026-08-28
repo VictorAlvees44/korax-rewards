@@ -566,6 +566,42 @@ input, select { font-family: inherit; }
   animation: entrarFundo 0.25s ease;
 }
 
+.tela-login-admin {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 9, 18, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.login-admin__caixa {
+  width: min(440px, 100%);
+  text-align: left;
+}
+
+.login-admin__caixa h1 {
+  margin: 0 0 12px;
+  font-family: var(--fonte-display);
+  font-size: 1.65rem;
+}
+
+.login-admin__caixa .botao-principal { width: 100%; margin-top: 12px; }
+.login-admin__caixa code { color: var(--cor-primaria-clara); }
+.painel__acoes-cabecalho { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.documento-legal { max-width: 820px; line-height: 1.7; }
+.documento-legal h1, .documento-legal h2 { font-family: var(--fonte-display); }
+.documento-legal h2 { margin-top: 28px; color: var(--cor-primaria-clara); }
+
+a { color: var(--cor-primaria-clara); }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid var(--cor-primaria-clara);
+  outline-offset: 3px;
+}
+
 /* ============================= RESPONSIVO ==============================*/
 
 @media (max-width: 720px) {

@@ -24,18 +24,18 @@ window.CONFIG_PADRAO = {
   empresa: {
     nome: "Sua Empresa",
     tituloRoleta: "Roleta da Sorte",
-    logoUrl: "assets/logo/logo.png",
+    logoUrl: "",
     planoFundoUrl: "",
     corPrimaria: "#C9A227",
     corSecundaria: "#0B1220",
     fonte: "Sora"
   },
   sons: {
-    giro: "assets/musicas/giro.mp3",
-    vitoria: "assets/musicas/vitoria.mp3",
-    derrota: "assets/musicas/derrota.mp3",
-    clique: "assets/musicas/clique.mp3",
-    parada: "assets/musicas/parada.mp3"
+    giro: "",
+    vitoria: "",
+    derrota: "",
+    clique: "",
+    parada: ""
   },
   roleta: {
     duracaoGiroMs: 4800,

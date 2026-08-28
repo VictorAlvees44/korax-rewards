@@ -2,25 +2,25 @@
   "empresa": {
     "nome": "Sua Empresa",
     "tituloRoleta": "Roleta da Sorte",
-    "logoUrl": "assets/logo/logo.png",
+    "logoUrl": "",
     "planoFundoUrl": "",
     "corPrimaria": "#C9A227",
     "corSecundaria": "#0B1220",
     "fonte": "Sora"
   },
   "sons": {
-    "giro": "assets/musicas/giro.mp3",
-    "vitoria": "assets/musicas/vitoria.mp3",
-    "derrota": "assets/musicas/derrota.mp3",
-    "clique": "assets/musicas/clique.mp3",
-    "parada": "assets/musicas/parada.mp3"
+    "giro": "",
+    "vitoria": "",
+    "derrota": "",
+    "clique": "",
+    "parada": ""
   },
   "roleta": {
     "duracaoGiroMs": 4800,
     "voltasMinimas": 6
   },
   "webhook": {
-    "url": ""
+    "url": "https://script.google.com/macros/s/AKfycbztoFQ0_IT3JV5HJC8ixhmGbEyNi8Kt5oRZoNdkpuPkwOxTxvfytoW1wFkkQFDvVzWZ/exec"
   },
   "premios": [
     { "id": "p1", "nome": "Chocolate", "cor": "#C9A227", "categoria": "Brinde", "descricao": "Um chocolate para adoçar o dia", "positivo": true, "som": "" },

@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' data: blob: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'">
 <title>Roleta da Sorte Corporativa</title>
 <meta name="description" content="Roleta da sorte corporativa para campanhas comerciais e eventos">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,7 +19,7 @@
   <div class="palco__fundo" id="fundoPersonalizado" aria-hidden="true"></div>
 
   <header class="topo">
-    <img id="logoEmpresa" class="topo__logo" src="assets/logo/logo.png" alt="Logo da empresa" onerror="this.style.display='none'">
+    <img id="logoEmpresa" class="topo__logo oculto" alt="Logo da empresa">
     <h1 class="topo__titulo" id="topoTitulo">Roleta da Sorte</h1>
     <button id="btnTelaCheia" class="botao-icone" title="Tela cheia" aria-label="Alternar tela cheia">⛶</button>
   </header>
@@ -42,7 +44,7 @@
 <div id="modalNome" class="modal oculto" role="dialog" aria-modal="true" aria-labelledby="modalNomeTitulo">
   <div class="modal__caixa">
     <h2 id="modalNomeTitulo">Antes de girar...</h2>
-    <p>Informe o nome do participante para registrar o resultado.</p>
+    <p>Informe o nome do participante para registrar o resultado. Ao continuar, você concorda com o <a href="privacidade.html" target="_blank" rel="noopener">aviso de privacidade</a>.</p>
     <label for="inputNomeParticipante" class="rotulo">Nome do participante</label>
     <input id="inputNomeParticipante" class="campo" type="text" maxlength="60" placeholder="Ex: Maria Silva" autocomplete="off">
     <p id="erroNome" class="erro oculto">Digite um nome para continuar.</p>

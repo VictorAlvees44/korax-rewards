@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' data: blob: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
 <title>Admin — Roleta da Sorte Corporativa</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,7 +13,18 @@
 </head>
 <body>
 
-<section class="painel">
+<div id="telaLoginAdmin" class="tela-login-admin oculto" role="dialog" aria-modal="true" aria-labelledby="tituloLoginAdmin">
+  <form id="formLoginAdmin" class="modal__caixa login-admin__caixa">
+    <h1 id="tituloLoginAdmin">Acesso administrativo</h1>
+    <p>Digite o segredo configurado na propriedade <code>ADMIN_SECRET</code> do Google Apps Script.</p>
+    <label for="inputSegredoAdmin" class="rotulo">Segredo administrativo</label>
+    <input id="inputSegredoAdmin" class="campo" type="password" autocomplete="current-password" required maxlength="200">
+    <p id="erroLoginAdmin" class="erro oculto" role="alert"></p>
+    <button id="btnEntrarAdmin" class="botao-principal" type="submit">Entrar</button>
+  </form>
+</div>
+
+<section id="painelAdmin" class="painel" inert aria-hidden="true">
   <div class="painel__cabecalho painel__cabecalho--admin">
     <div>
       <h2>Painel Administrativo</h2>
@@ -20,12 +33,14 @@
         <span id="seloPerfilAtivoTopo" class="cartao-perfil__selo oculto">ATIVO NA ROLETA</span>
       </p>
     </div>
-    <a href="../index.html" class="botao-secundario" target="_blank" rel="noopener">Ver roleta pública ↗</a>
+    <div class="painel__acoes-cabecalho">
+      <a href="../index.html" class="botao-secundario" target="_blank" rel="noopener">Ver roleta pública ↗</a>
+      <button id="btnSairAdmin" class="botao-secundario" type="button">Sair</button>
+    </div>
   </div>
 
-  <div class="painel__dica painel__dica--aviso">
-    Esta página não tem senha — qualquer pessoa com o link pode acessá-la e editar os perfis.
-    Evite compartilhar o link de <code>/admin</code> com quem não deve ter acesso.
+  <div class="painel__dica">
+    As operações administrativas são validadas pelo backend. O segredo fica somente nesta aba e é removido ao fechar o navegador ou clicar em “Sair”.
   </div>
 
   <nav class="painel__abas" role="tablist">
@@ -70,11 +85,11 @@
       </div>
       <div class="campo-grupo">
         <label for="inputLogoUpload">Logo (upload)</label>
-        <input id="inputLogoUpload" class="campo" type="file" accept="image/*">
+        <input id="inputLogoUpload" class="campo" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
       </div>
       <div class="campo-grupo">
         <label for="inputFundoUpload">Plano de fundo (upload)</label>
-        <input id="inputFundoUpload" class="campo" type="file" accept="image/*">
+        <input id="inputFundoUpload" class="campo" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
       </div>
       <div class="campo-grupo">
         <label for="inputCorPrimaria">Cor primária</label>
@@ -101,23 +116,23 @@
     <div class="grade-form">
       <div class="campo-grupo">
         <label for="uploadSomGiro">Som durante o giro</label>
-        <input id="uploadSomGiro" class="campo" type="file" accept="audio/*">
+        <input id="uploadSomGiro" class="campo" type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/x-m4a">
       </div>
       <div class="campo-grupo">
         <label for="uploadSomVitoria">Som de vitória</label>
-        <input id="uploadSomVitoria" class="campo" type="file" accept="audio/*">
+        <input id="uploadSomVitoria" class="campo" type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/x-m4a">
       </div>
       <div class="campo-grupo">
         <label for="uploadSomDerrota">Som de derrota</label>
-        <input id="uploadSomDerrota" class="campo" type="file" accept="audio/*">
+        <input id="uploadSomDerrota" class="campo" type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/x-m4a">
       </div>
       <div class="campo-grupo">
         <label for="uploadSomClique">Som de clique</label>
-        <input id="uploadSomClique" class="campo" type="file" accept="audio/*">
+        <input id="uploadSomClique" class="campo" type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/x-m4a">
       </div>
       <div class="campo-grupo">
         <label for="uploadSomParada">Som de parada</label>
-        <input id="uploadSomParada" class="campo" type="file" accept="audio/*">
+        <input id="uploadSomParada" class="campo" type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/x-m4a">
       </div>
     </div>
   </div>
@@ -132,7 +147,7 @@
       roleta pública exibe agora.
     </p>
     <div class="painel__acoes-topo">
-      <input id="inputNomeNovoPerfil" class="campo campo-perfil" type="text" placeholder="Nome do perfil (ex: Feira Cliente A)">
+      <input id="inputNomeNovoPerfil" class="campo campo-perfil" type="text" maxlength="80" placeholder="Nome do perfil (ex: Feira Cliente A)">
       <button id="btnSalvarNovoPerfil" class="botao-principal">Salvar layout atual como perfil</button>
     </div>
     <div id="listaPerfis" class="lista-perfis"></div>

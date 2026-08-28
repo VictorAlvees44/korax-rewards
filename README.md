@@ -1,273 +1,105 @@
-# Roleta da Sorte Corporativa
+# Korax Rewards — Roleta da Sorte
 
-Aplicação web para campanhas do setor comercial e eventos com clientes
-(feiras): uma roleta de prêmios moderna, com painel administrativo
-separado, layouts (perfis) que sincronizam entre qualquer navegador ou
-dispositivo, registro obrigatório de cada giro no Google Sheets
-(organizado por layout e por mês) e notificação automática por e-mail.
-Feita em HTML5, CSS3 e JavaScript puro (ES6), sem frameworks — funciona
-100% no GitHub Pages.
+Roleta corporativa para campanhas e eventos, publicada no GitHub Pages e integrada a um backend Google Apps Script. O servidor escolhe e registra cada resultado de forma autoritativa, organiza os giros por perfil e mês no Google Sheets e envia notificações por e-mail.
 
----
+Produção: <https://victoralvees44.github.io/korax-rewards/>
 
-## Sumário
+## Arquitetura
 
-1. [Descrição](#descrição)
-2. [Estrutura do projeto](#estrutura-do-projeto)
-3. [Como funciona a sincronização entre dispositivos](#como-funciona-a-sincronização-entre-dispositivos)
-4. [Passo a passo do zero até a publicação](#passo-a-passo-do-zero-até-a-publicação)
-5. [Usando o painel administrativo (/admin)](#usando-o-painel-administrativo-admin)
-6. [Perfis: um layout por cliente/evento](#perfis-um-layout-por-clienteevento)
-7. [Planilha organizada por layout e por mês](#planilha-organizada-por-layout-e-por-mês)
-8. [Sorteio 100% aleatório, sem pesos](#sorteio-100-aleatório-sem-pesos)
-9. [Backup e restauração](#backup-e-restauração)
-10. [Solução de problemas](#solução-de-problemas)
+```text
+Navegador público ── sorteio/registro ──> Google Apps Script ──> Sheets + e-mail
+        │                                      │
+        └── cache somente de layout             └── perfis no Google Drive
 
----
-
-## Descrição
-
-- Roleta em tela cheia, com animação de aceleração/desaceleração natural.
-- Modal obrigatório de nome do participante antes de girar.
-- Tela de resultado com efeitos diferentes para prêmio positivo e negativo
-  (confetes, glow e som de vitória / animação e som de derrota).
-- Todo giro é enviado obrigatoriamente ao Google Sheets via Google Apps
-  Script, com layout, nome, prêmio, tipo, data e hora.
-- E-mail automático a cada novo giro registrado.
-- **Painel administrativo separado** (`/admin`), fora da tela pública da
-  roleta.
-- **Perfis (layouts) centralizados**: salvos no backend, não no
-  navegador — funcionam em qualquer computador, tablet ou celular.
-- Sorteio 100% aleatório e uniforme entre os prêmios cadastrados (sem
-  pesos/probabilidades para configurar).
-- Exportação e importação de configurações em JSON (para backup manual).
-
-## Estrutura do projeto
-
-```
-roleta/
-├── index.html                 → tela pública da roleta (SEM painel)
-├── admin/
-│   └── index.html             → painel administrativo (rota /admin)
-├── style.css                  → visual, animações e responsividade
-├── core.js                    → módulo compartilhado (estado, backend, canvas, confete)
-├── roleta-app.js               → lógica da tela pública
-├── admin/admin-app.js          → lógica do painel administrativo
-├── config.js                   → configuração padrão embutida (fallback + URL do backend)
-├── config.json                 → configuração de referência/exportação
-├── README.md                   → esta documentação
-├── assets/
-│   ├── logo/                   → logotipo padrão
-│   ├── musicas/                 → sons padrão
-│   └── imagens/                 → imagens padrão
-└── google-apps-script/
-    ├── Code.gs                  → backend (perfis, perfil ativo, planilha, e-mail)
-    └── appsscript.json           → manifesto do projeto Apps Script
+Painel /admin ── segredo em sessionStorage ──> validação com ADMIN_SECRET
 ```
 
----
+- `index.html`: roleta pública.
+- `admin/`: painel autenticado de perfis e aparência.
+- `core.js`: comunicação, validação, desenho e efeitos compartilhados.
+- `roleta-app.js`: fluxo público.
+- `google-apps-script/`: backend que deve ser copiado para a planilha.
+- `privacidade.html`: aviso de privacidade que deve receber os contatos da empresa responsável.
 
-## Como funciona a sincronização entre dispositivos
+## Garantias importantes
 
-Antes, os layouts ficavam salvos só no `LocalStorage` do navegador — por
-isso não apareciam em outro computador ou tablet. Agora o **Google Apps
-Script guarda tudo centralmente**, em uma pasta do Google Drive vinculada
-ao script:
+- O navegador não escolhe nem informa o prêmio: o Apps Script sorteia, grava e devolve o resultado.
+- Cada giro possui ID aleatório e uma aba de controle oculta impede registros duplicados.
+- Se o backend falhar, nenhum resultado não oficial é exibido. A aplicação requer internet para girar.
+- Data e hora registradas vêm do servidor, no fuso `America/Sao_Paulo`.
+- Dados gravados no Sheets são neutralizados contra fórmulas maliciosas.
+- Alterar, publicar, listar ou excluir perfis exige `ADMIN_SECRET`.
+- O segredo administrativo permanece apenas na memória do módulo e no `sessionStorage` da aba; nunca é gravado no repositório ou enviado em URL.
+- O backend limita cada identificador de navegador a 20 giros por janela de cinco minutos. Esse limite reduz abuso acidental, mas não substitui CAPTCHA/WAF quando o link for divulgado em larga escala.
 
-- **Biblioteca de perfis** — todos os layouts salvos (um arquivo JSON por
-  perfil).
-- **Perfil ativo** — qual layout está publicado *agora* na roleta
-  pública (um único arquivo JSON).
+## Implantar o Google Apps Script
 
-Fluxo real de uso em uma feira:
+1. Crie ou abra a planilha de registros e acesse **Extensões → Apps Script**.
+2. Substitua `Code.gs` pelo conteúdo de `google-apps-script/Code.gs`.
+3. Ative a exibição do manifesto nas configurações do editor e substitua `appsscript.json` pelo arquivo do repositório.
+4. Em **Configurações do projeto → Propriedades do script**, crie:
 
-1. No `/admin`, você monta ou carrega o layout do próximo cliente.
-2. Testa com o botão **"Testar giro"** (não registra nada).
-3. Quando o cliente chegar, clica em **"Publicar este layout na roleta
-   pública"**.
-4. Em qualquer tablet/notebook que esteja com `index.html` aberto (ou que
-   abrir agora), a roleta pública busca o perfil ativo no backend e
-   exibe exatamente esse layout — sem precisar reconfigurar nada
-   naquele aparelho.
+   - `ADMIN_SECRET`: senha aleatória longa, exclusiva deste sistema. Recomendado: no mínimo 32 caracteres.
+   - `EMAIL_DESTINATARIO`: um ou mais e-mails separados por vírgula.
 
-Isso só funciona porque **todos os dispositivos apontam para o mesmo
-backend** — o que nos leva ao próximo ponto: a URL do Web App precisa
-estar fixada em `config.js` (veja o passo a passo abaixo), não apenas
-digitada no painel de um navegador específico.
+5. Em **Implantar → Nova implantação → App da Web**, selecione:
 
-Se a internet cair no meio de um evento, a roleta pública usa o último
-perfil que conseguiu buscar (guardado em cache local) até a conexão
-voltar.
+   - Executar como: **Eu**.
+   - Quem pode acessar: **Qualquer pessoa**. A roleta pública precisa chamar o sorteio; as ações administrativas continuam protegidas dentro do código.
 
----
+6. Autorize explicitamente Google Drive, planilha e envio de e-mail.
+7. Copie a URL terminada em `/exec` e atualize `webhook.url` em `config.js` e `config.json`.
+8. Após qualquer alteração no backend, use **Gerenciar implantações → Editar → Nova versão**. Salvar `Code.gs` sem criar uma nova versão não atualiza a produção.
 
-## Passo a passo do zero até a publicação
+### Diagnóstico do backend
 
-### 1. Criar a planilha do Google Sheets
+Abra `SUA_URL/exec?acao=saude`. A resposta esperada é:
 
-1. Acesse [sheets.google.com](https://sheets.google.com) e crie uma
-   planilha nova.
-2. Dê um nome, por exemplo **"Roleta Corporativa — Registros"**.
-3. Não é necessário criar abas manualmente: o script cria automaticamente
-   uma aba por layout + mês (veja [mais abaixo](#planilha-organizada-por-layout-e-por-mês)).
+```json
+{"status":"sucesso","servico":"Roleta da Sorte Corporativa","configurado":true}
+```
 
-### 2. Criar o Google Apps Script
+Em seguida abra `SUA_URL/exec?acao=configAtivo`. Antes do primeiro perfil publicado, `dados` pode ser `null`, mas não deve existir erro de permissão. Se aparecer erro do `DriveApp`, reautorize as permissões e publique uma nova versão.
 
-1. Na planilha, vá em **Extensões → Apps Script**.
-2. Apague o conteúdo padrão do arquivo `Code.gs` que abrir.
-3. Copie todo o conteúdo de `google-apps-script/Code.gs` deste projeto e
-   cole no editor.
-4. No arquivo `appsscript.json` do editor (ative em **Configurações do
-   projeto → Mostrar arquivo "appsscript.json" no editor**), substitua o
-   conteúdo pelo arquivo `google-apps-script/appsscript.json` deste
-   projeto.
-5. No topo de `Code.gs`, edite a constante `EMAIL_DESTINATARIO` com o
-   e-mail que deve receber as notificações.
+## Primeiro acesso ao admin
 
-### 3. Publicar o Web App
+1. Acesse `/admin/`.
+2. Digite exatamente o valor definido em `ADMIN_SECRET`.
+3. Monte o perfil, salve e clique em **Publicar este layout na roleta pública**.
+4. Use **Sair** em computadores compartilhados.
 
-1. No editor do Apps Script, clique em **Implantar → Nova implantação**.
-2. Em "Selecionar tipo", escolha **App da Web**.
-3. Em "Executar como", selecione **Eu (seu e-mail)**.
-4. Em "Quem pode acessar", selecione **Qualquer pessoa**.
-5. Clique em **Implantar** e autorize as permissões solicitadas. Como o
-   backend agora também guarda perfis no Google Drive, a tela de
-   permissões vai pedir acesso à sua conta do Drive além da planilha e
-   do e-mail — isso é esperado, autorize normalmente.
-6. Copie a **URL do Web App** gerada — algo como:
-   `https://script.google.com/macros/s/AKfycb.../exec`
+Uploads individuais de imagem ou áudio são limitados a 2 MB. O perfil completo não pode ultrapassar 8 MB. SVG não é aceito, reduzindo risco de conteúdo ativo.
 
-> Sempre que editar o `Code.gs`, é necessário criar uma **nova
-> implantação** (ou gerenciar implantações → editar → nova versão) para
-> que as alterações entrem em vigor na URL publicada.
+## Planilhas e idempotência
 
-### 4. Fixar a URL do backend em `config.js` (passo essencial)
+Os giros são gravados em abas no formato `Perfil - MM-AAAA`. A primeira coluna contém o `ID do Giro`. A aba oculta `_Controle_Giros` é o índice de idempotência: repetir a mesma requisição devolve o resultado original sem criar outra linha ou enviar outro e-mail.
 
-Diferente da versão anterior, a URL **não deve** ser configurada apenas
-pelo painel — isso só vale para testes rápidos naquele navegador. Para
-que **todo dispositivo** funcione corretamente:
+Abas antigas são migradas automaticamente com a inclusão da coluna `ID do Giro` na primeira utilização.
 
-1. Abra o arquivo `config.js` deste projeto.
-2. Encontre o campo `webhook: { url: "" }`.
-3. Cole a URL do Web App copiada no passo anterior.
-4. Salve e publique esse arquivo junto com o resto do projeto no GitHub
-   Pages (próximo passo).
+## Privacidade e operação
 
-### 5. Publicar no GitHub Pages
+Antes de uma campanha real:
 
-1. Crie uma conta em [github.com](https://github.com), se ainda não
-   tiver.
-2. Crie um novo repositório (pode ser público ou privado, desde que o
-   plano permita Pages em repositórios privados).
-3. Envie todos os arquivos deste projeto para o repositório:
-   ```bash
-   git init
-   git add .
-   git commit -m "Roleta da Sorte Corporativa"
-   git branch -M main
-   git remote add origin https://github.com/SEU-USUARIO/SEU-REPOSITORIO.git
-   git push -u origin main
-   ```
-4. No repositório, vá em **Settings → Pages**.
-5. Em "Source", selecione a branch `main` e a pasta `/ (root)`.
-6. Clique em **Save**. Após alguns instantes, o GitHub mostrará a URL
-   pública, algo como:
-   `https://SEU-USUARIO.github.io/SEU-REPOSITORIO/`
-7. A roleta pública fica em `https://SEU-USUARIO.github.io/SEU-REPOSITORIO/`
-   e o painel administrativo em
-   `https://SEU-USUARIO.github.io/SEU-REPOSITORIO/admin/`.
+- Edite `privacidade.html` com razão social, contato do controlador e canal para solicitações LGPD.
+- Defina formalmente o prazo de retenção e uma rotina de exclusão/anonimização na planilha.
+- Restrinja o compartilhamento da planilha e da pasta de perfis no Google Drive.
+- Faça backup dos perfis pelo botão **Exportar JSON** e backup periódico da planilha.
+- Monitore os registros de execução e as cotas de e-mail do Apps Script.
 
----
+## Desenvolvimento e verificações
 
-## Usando o painel administrativo (/admin)
+Requer Node.js 20 ou superior, sem dependências externas de runtime.
 
-O painel agora é uma página própria, separada da roleta pública, com uma
-prévia da roleta sempre visível enquanto você edita. Abas:
+```bash
+npm ci
+npm run check
+npm test
+```
 
-- **Prêmios** — adicionar, editar ou remover prêmios. A cor de um prêmio
-  novo é **sorteada automaticamente**; você só precisa mudar se quiser.
-- **Visual** — nome da empresa, título da roleta, logo, plano de fundo,
-  cores e fonte.
-- **Sons** — upload dos sons de giro, vitória, derrota, clique e parada.
-- **Perfis** — salvar o layout atual na biblioteca, carregar outro para
-  editar, ou excluir.
-- **Configurações** — duração/voltas do giro, exportar/importar JSON, e
-  um campo de URL do backend (só para teste local — a URL "de fábrica"
-  fica em `config.js`).
-- **Histórico** e **Estatísticas** — espelho local (deste navegador) dos
-  últimos giros, útil para conferência rápida durante o evento. O
-  registro completo e oficial fica na planilha.
+O workflow `.github/workflows/quality.yml` executa validação de sintaxe, JSON, referências locais, CSP, ausência dos fluxos inseguros antigos e testes unitários em cada push ou pull request.
 
-Dois botões ficam sempre visíveis, acima das abas:
+## Limitações conhecidas
 
-- **🎲 Testar giro** — gira a prévia sem registrar nada, só para conferir
-  o layout.
-- **🚀 Publicar este layout na roleta pública** — salva e ativa esse
-  layout como o que a roleta pública deve exibir agora, em qualquer
-  dispositivo.
-
-> ⚠️ **Sobre segurança:** o link `/admin` não tem senha — qualquer pessoa
-> com o endereço pode acessá-lo e editar tudo. Evite divulgar esse link
-> publicamente. Se isso for uma preocupação (por exemplo, em um evento
-> com o link circulando), me avise e adicionamos uma proteção simples.
-
-## Perfis: um layout por cliente/evento
-
-1. No `/admin`, monte o layout normalmente: prêmios, cores, sons.
-2. Vá até a aba **Perfis**, digite um nome (ex: "Feira Cliente A") e
-   clique em **Salvar layout atual como perfil** — isso grava na
-   biblioteca central, mas ainda não afeta a roleta pública.
-3. Quando quiser que a roleta pública passe a exibir esse layout, use o
-   botão **Publicar este layout na roleta pública** (fica sempre visível
-   acima das abas).
-4. Para editar um perfil já salvo, vá em **Perfis → Carregar para
-   editar**. Editar e salvar não muda automaticamente o que está
-   publicado — só o botão "Publicar" faz isso, o que permite preparar o
-   próximo layout com calma sem interromper o que está ativo agora.
-5. Um perfil que não é mais necessário pode ser removido com **Excluir**.
-
-## Planilha organizada por layout e por mês
-
-Cada giro grava numa aba nomeada `"<Nome do Layout> - MM/AAAA"` — por
-exemplo, um giro do perfil "Comercial" em agosto de 2026 vai para a aba
-**"Comercial - 08/2026"**. Uma aba nova só é criada no primeiro giro
-daquele layout naquele mês; giros seguintes do mesmo layout e mês só
-acrescentam linhas na aba já existente. Isso significa:
-
-- Layouts diferentes (ex: "Comercial" e "Feira Cliente A") nunca se
-  misturam na mesma aba.
-- Ao virar o mês, o próximo giro de cada layout abre automaticamente uma
-  aba nova para aquele mês — o histórico de meses anteriores continua
-  intacto e separado.
-- O mês considerado é o do servidor do Google (fuso de São Paulo, já
-  configurado no `appsscript.json`), não o relógio do celular/tablet do
-  participante.
-
-## Sorteio 100% aleatório, sem pesos
-
-Todos os prêmios cadastrados têm a mesma probabilidade de sair — não há
-mais campo de "peso" para configurar. Isso também significa que não há
-trava de "1 giro por pessoa": a mesma pessoa pode girar várias vezes
-seguidas (por exemplo, se uma venda dá direito a 5 giros), sem qualquer
-bloqueio no sistema.
-
-## Backup e restauração
-
-Use **Exportar JSON** (aba Configurações do admin) para baixar o layout
-que está em edição, e **Importar JSON** para recarregá-lo depois — útil
-como backup manual além da biblioteca central, ou para levar um layout
-específico para outro projeto/backend.
-
-## Solução de problemas
-
-- **A roleta pública mostra o layout padrão, não o que eu publiquei** —
-  confira se `config.js` tem a URL correta do Web App e se ela foi
-  publicada no GitHub Pages (não só salva localmente pelo painel).
-- **"URL do Web App não configurada em config.js"** — falta preencher o
-  campo `webhook.url` em `config.js` (veja o passo 4 do deploy).
-- **Erro de permissão do Google Drive ao salvar perfil** — normalmente
-  resolve reautorizando o Web App (Implantar → Gerenciar implantações →
-  editar → nova versão, autorizando o acesso ao Drive quando solicitado).
-- **Giros não aparecem na planilha em tempo real** — pode ser apenas a
-  fila local tentando reenviar; verifique a conexão do dispositivo e
-  aguarde, o reenvio é automático quando a internet voltar.
+- O GitHub Pages não permite configurar todos os cabeçalhos HTTP. Uma CSP equivalente é fornecida por `<meta>`. Para cabeçalhos como HSTS e `X-Content-Type-Options`, use um domínio atrás de Cloudflare ou outro host configurável.
+- O limite por identificador do navegador é uma barreira operacional, não uma identidade forte. Campanhas públicas de alto valor devem adicionar proteção de borda, CAPTCHA ou emissão de convites individuais.
+- O frontend pode continuar exibindo o último layout em cache quando a consulta de perfil falhar, mas giros novos só ocorrem com confirmação do servidor.

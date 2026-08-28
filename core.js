@@ -16,7 +16,9 @@
 
 export const CHAVE_CACHE_CONFIG_ATIVO = "roletaCorp_cache_config_ativo_v2";
 export const CHAVE_HISTORICO = "roletaCorp_historico_v2";
-export const CHAVE_FILA_PENDENTE = "roletaCorp_fila_pendente_v2";
+export const CHAVE_CLIENTE = "roletaCorp_cliente_v3";
+
+let segredoAdmin = "";
 
 export const Estado = {
   config: null,
@@ -34,7 +36,14 @@ export function obterUrlBackend() {
   // A URL do Web App deve vir "de fábrica" do config.js (editada uma vez
   // por você ao publicar) para que TODOS os dispositivos/navegadores
   // apontem para o mesmo backend, sem depender de configuração local.
-  return (window.CONFIG_PADRAO && window.CONFIG_PADRAO.webhook && window.CONFIG_PADRAO.webhook.url) || "";
+  const valor = (window.CONFIG_PADRAO && window.CONFIG_PADRAO.webhook && window.CONFIG_PADRAO.webhook.url) || "";
+  try {
+    const url = new URL(valor);
+    if (url.protocol !== "https:" || url.hostname !== "script.google.com" || !/^\/macros\/s\/[^/]+\/exec$/.test(url.pathname)) return "";
+    return url.toString();
+  } catch (erro) {
+    return "";
+  }
 }
 
 /* ========================================================================
@@ -45,7 +54,7 @@ async function chamarBackendGet(acao, params = {}) {
   const url = obterUrlBackend();
   if (!url) throw new Error("URL do Web App não configurada em config.js.");
   const query = new URLSearchParams({ acao, ...params }).toString();
-  const resposta = await fetch(`${url}?${query}`, { method: "GET" });
+  const resposta = await fetchComTimeout(`${url}?${query}`, { method: "GET" });
   const dados = await resposta.json();
   if (dados.status !== "sucesso") throw new Error(dados.mensagem || "Erro desconhecido no backend.");
   return dados;
@@ -54,7 +63,7 @@ async function chamarBackendGet(acao, params = {}) {
 async function chamarBackendPost(corpo) {
   const url = obterUrlBackend();
   if (!url) throw new Error("URL do Web App não configurada em config.js.");
-  const resposta = await fetch(url, {
+  const resposta = await fetchComTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS no Apps Script
     body: JSON.stringify(corpo)
@@ -62,6 +71,31 @@ async function chamarBackendPost(corpo) {
   const dados = await resposta.json();
   if (dados.status !== "sucesso") throw new Error(dados.mensagem || "Erro desconhecido no backend.");
   return dados;
+}
+
+async function fetchComTimeout(url, opcoes, timeoutMs = 15000) {
+  const controlador = new AbortController();
+  const timer = setTimeout(() => controlador.abort(), timeoutMs);
+  try {
+    const resposta = await fetch(url, { ...opcoes, signal: controlador.signal });
+    if (!resposta.ok) throw new Error(`Backend respondeu HTTP ${resposta.status}.`);
+    return resposta;
+  } catch (erro) {
+    if (erro && erro.name === "AbortError") throw new Error("O backend demorou demais para responder.");
+    throw erro;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function configurarCredencialAdmin(valor) {
+  segredoAdmin = String(valor || "");
+}
+
+export async function autenticarAdminRemoto(valor) {
+  await chamarBackendPost({ acao: "autenticarAdmin", adminSecret: String(valor || "") });
+  configurarCredencialAdmin(valor);
+  return true;
 }
 
 /** Busca o perfil atualmente publicado para a roleta pública. */
@@ -72,53 +106,55 @@ export async function buscarConfigAtivoRemoto() {
 
 /** Lista todos os perfis salvos na "biblioteca" central. */
 export async function listarPerfisRemoto() {
-  const dados = await chamarBackendGet("listarPerfis");
+  const dados = await chamarBackendPost({ acao: "listarPerfis", adminSecret: segredoAdmin });
   return dados.perfis || {}; // { nomeDoPerfil: config, ... }
 }
 
 /** Salva (cria ou sobrescreve) um perfil na biblioteca central, sem publicá-lo. */
 export async function salvarPerfilRemoto(nome, config) {
-  return chamarBackendPost({ acao: "salvarPerfil", nome, config });
+  return chamarBackendPost({ acao: "salvarPerfil", nome, config, adminSecret: segredoAdmin });
 }
 
 /** Publica um perfil como o que a roleta pública deve exibir agora. */
 export async function ativarPerfilRemoto(nome, config) {
-  return chamarBackendPost({ acao: "ativarPerfil", nome, config });
+  return chamarBackendPost({ acao: "ativarPerfil", nome, config, adminSecret: segredoAdmin });
 }
 
 /** Remove um perfil da biblioteca central. */
 export async function excluirPerfilRemoto(nome) {
-  return chamarBackendPost({ acao: "excluirPerfil", nome });
+  return chamarBackendPost({ acao: "excluirPerfil", nome, adminSecret: segredoAdmin });
 }
 
-/** Registra um giro (obrigatório) — grava na planilha do mês/layout correto. */
-export async function registrarGiroRemoto(registro) {
-  try {
-    await chamarBackendPost({ acao: "registrarGiro", ...registro });
-    return { ok: true };
-  } catch (erro) {
-    console.error("Falha ao registrar giro remotamente:", erro);
-    enfileirarPendente(registro);
-    return { ok: false, erro };
+/** O backend sorteia e registra atomicamente; o cliente apenas anima o resultado. */
+export async function sortearGiroRemoto(nome, idGiro = gerarIdSeguro()) {
+  const dados = await chamarBackendPost({
+    acao: "sortearGiro",
+    idGiro,
+    clienteId: obterClienteId(),
+    nome: String(nome || "").trim()
+  });
+  return dados.dados;
+}
+
+export function gerarIdSeguro() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID().replace(/-/g, "");
   }
-}
-
-function enfileirarPendente(registro) {
-  const fila = JSON.parse(localStorage.getItem(CHAVE_FILA_PENDENTE) || "[]");
-  fila.push(registro);
-  localStorage.setItem(CHAVE_FILA_PENDENTE, JSON.stringify(fila));
-}
-
-export async function tentarReenviarPendentes() {
-  if (!obterUrlBackend()) return;
-  const fila = JSON.parse(localStorage.getItem(CHAVE_FILA_PENDENTE) || "[]");
-  if (fila.length === 0) return;
-  const restantes = [];
-  for (const registro of fila) {
-    const resultado = await registrarGiroRemoto(registro).catch(() => ({ ok: false }));
-    if (!resultado || !resultado.ok) restantes.push(registro);
+  if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
-  localStorage.setItem(CHAVE_FILA_PENDENTE, JSON.stringify(restantes));
+  throw new Error("Este navegador não oferece geração segura de identificadores.");
+}
+
+export function obterClienteId() {
+  let id = localStorage.getItem(CHAVE_CLIENTE);
+  if (!id || !/^[A-Za-z0-9_-]{16,80}$/.test(id)) {
+    id = gerarIdSeguro();
+    localStorage.setItem(CHAVE_CLIENTE, id);
+  }
+  return id;
 }
 
 /* ========================================================================
@@ -147,6 +183,7 @@ export async function obterConfigParaExibir() {
   try {
     const remoto = await buscarConfigAtivoRemoto();
     if (remoto && remoto.config) {
+      validarConfiguracao(remoto.config);
       cachearConfigAtivo(remoto.nome, remoto.config);
       return { nome: remoto.nome, config: remoto.config, origem: "remoto" };
     }
@@ -154,7 +191,14 @@ export async function obterConfigParaExibir() {
     console.warn("Não foi possível buscar o perfil ativo do backend:", erro);
   }
   const cache = lerCacheConfigAtivo();
-  if (cache) return { nome: cache.nome, config: cache.config, origem: "cache" };
+  if (cache) {
+    try {
+      validarConfiguracao(cache.config);
+      return { nome: cache.nome, config: cache.config, origem: "cache" };
+    } catch (erro) {
+      localStorage.removeItem(CHAVE_CACHE_CONFIG_ATIVO);
+    }
+  }
   return { nome: "", config: structuredClone(window.CONFIG_PADRAO), origem: "padrao" };
 }
 
@@ -178,7 +222,7 @@ export function adicionarHistorico(registro) {
    ======================================================================== */
 
 export function gerarId() {
-  return "p" + Math.random().toString(36).slice(2, 9);
+  return "p" + gerarIdSeguro().slice(0, 12);
 }
 
 /** Gera uma cor hexadecimal aleatória, mas vibrante e legível
@@ -205,6 +249,38 @@ export function formatarDataHora(data) {
     data: `${pad(data.getDate())}/${pad(data.getMonth() + 1)}/${data.getFullYear()}`,
     hora: `${pad(data.getHours())}:${pad(data.getMinutes())}:${pad(data.getSeconds())}`
   };
+}
+
+/** Validação defensiva usada antes de aceitar JSON importado no admin. */
+export function validarConfiguracao(config) {
+  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("estrutura raiz inválida");
+  const serializada = JSON.stringify(config);
+  if (serializada.length > 8 * 1024 * 1024) throw new Error("o perfil excede 8 MB");
+  if (!config.empresa || !config.sons || !config.roleta) throw new Error("seções obrigatórias ausentes");
+  if (!Array.isArray(config.premios) || config.premios.length < 2 || config.premios.length > 50) {
+    throw new Error("use entre 2 e 50 prêmios");
+  }
+  const ids = new Set();
+  config.premios.forEach((premio, indice) => {
+    if (!premio || typeof premio !== "object") throw new Error(`prêmio ${indice + 1} inválido`);
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(premio.id || "")) || ids.has(premio.id)) {
+      throw new Error("os IDs dos prêmios devem ser únicos e alfanuméricos");
+    }
+    ids.add(premio.id);
+    if (!String(premio.nome || "").trim() || String(premio.nome).length > 80) throw new Error(`nome do prêmio ${indice + 1} inválido`);
+    if (!/^#[0-9A-Fa-f]{6}$/.test(String(premio.cor || ""))) throw new Error(`cor do prêmio ${indice + 1} inválida`);
+  });
+  const duracao = Number(config.roleta.duracaoGiroMs);
+  const voltas = Number(config.roleta.voltasMinimas);
+  if (!Number.isFinite(duracao) || duracao < 2000 || duracao > 15000) throw new Error("duração deve ficar entre 2 e 15 segundos");
+  if (!Number.isInteger(voltas) || voltas < 2 || voltas > 20) throw new Error("voltas mínimas deve ficar entre 2 e 20");
+  [config.empresa.logoUrl, config.empresa.planoFundoUrl, ...Object.values(config.sons)].forEach((valor) => {
+    const url = String(valor || "");
+    if (/^(javascript|vbscript|file):/i.test(url) || /^data:(?!image\/(png|jpeg|webp|gif)|audio\/(mpeg|mp3|wav|ogg|webm|mp4|x-m4a))/i.test(url)) {
+      throw new Error("o perfil contém uma URL de mídia não permitida");
+    }
+  });
+  return true;
 }
 
 export function mostrarToast(mensagem) {
@@ -234,6 +310,11 @@ export function atualizarLogoCentral(logoUrl) {
   const texto = document.getElementById("textoCentral");
   if (!img || !texto) return;
   if (logoUrl) {
+    img.onerror = () => {
+      img.removeAttribute("src");
+      img.classList.add("oculto");
+      texto.classList.remove("oculto");
+    };
     img.src = logoUrl;
     img.classList.remove("oculto");
     texto.classList.add("oculto");
@@ -248,7 +329,9 @@ export function carregarSonsNosElementos(config) {
   const mapa = { giro: "audioGiro", vitoria: "audioVitoria", derrota: "audioDerrota", clique: "audioClique", parada: "audioParada" };
   Object.entries(mapa).forEach(([chave, idAudio]) => {
     const el = document.getElementById(idAudio);
-    if (el && s[chave]) el.src = s[chave];
+    if (!el) return;
+    if (s[chave]) el.src = s[chave];
+    else el.removeAttribute("src");
   });
 }
 
@@ -260,8 +343,15 @@ export function aplicarVisualNaTela(config) {
   const logo = document.getElementById("logoEmpresa");
   const fundo = document.getElementById("fundoPersonalizado");
   const titulo = document.getElementById("topoTitulo");
-  if (logo && c.logoUrl) logo.src = c.logoUrl;
-  if (fundo && c.planoFundoUrl) fundo.style.backgroundImage = `url(${c.planoFundoUrl})`;
+  if (logo) {
+    if (c.logoUrl) {
+      logo.onerror = () => { logo.removeAttribute("src"); logo.classList.add("oculto"); };
+      logo.src = c.logoUrl;
+      logo.classList.remove("oculto");
+    }
+    else { logo.removeAttribute("src"); logo.classList.add("oculto"); }
+  }
+  if (fundo) fundo.style.backgroundImage = c.planoFundoUrl ? `url("${String(c.planoFundoUrl).replace(/["\\\n\r]/g, "")}")` : "none";
   if (titulo) titulo.textContent = c.tituloRoleta || "Roleta da Sorte";
   atualizarLogoCentral(c.logoUrl);
 }
@@ -335,7 +425,14 @@ export const Roleta = {
    ======================================================================== */
 
 export function sortearPremioAleatorio(premios) {
-  return premios[Math.floor(Math.random() * premios.length)];
+  if (!Array.isArray(premios) || premios.length === 0) throw new Error("Não há prêmios para sortear.");
+  if (!globalThis.crypto || typeof globalThis.crypto.getRandomValues !== "function") {
+    throw new Error("Este navegador não oferece aleatoriedade segura.");
+  }
+  const limite = Math.floor(0x100000000 / premios.length) * premios.length;
+  const valor = new Uint32Array(1);
+  do { globalThis.crypto.getRandomValues(valor); } while (valor[0] >= limite);
+  return premios[valor[0] % premios.length];
 }
 
 export function calcularAnguloFinal(premios, premioEscolhido) {

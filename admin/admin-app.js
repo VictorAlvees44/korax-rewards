@@ -10,12 +10,15 @@ import {
   Estado, Roleta,
   buscarConfigAtivoRemoto, listarPerfisRemoto, salvarPerfilRemoto,
   ativarPerfilRemoto, excluirPerfilRemoto,
+  autenticarAdminRemoto, configurarCredencialAdmin, validarConfiguracao,
   gerarId, gerarCorAleatoria, mostrarToast, carregarHistorico,
   aplicarVisualNaTela, carregarSonsNosElementos, sortearPremioAleatorio,
   girarRoleta, obterUrlBackend
 } from "../core.js";
 
 let Perfis = {}; // cache local em memória do que veio do backend: { nome: config }
+const CHAVE_SESSAO_ADMIN = "roletaCorp_admin_secret_v1";
+const TAMANHO_MAX_UPLOAD = 2 * 1024 * 1024;
 
 /* ========================================================================
    CONFIGURAÇÃO DE PARTIDA (SEM BACKEND / MODO OFFLINE)
@@ -62,20 +65,40 @@ function configurarPremios() {
 
 function renderizarListaPremios() {
   const lista = document.getElementById("listaPremios");
-  lista.innerHTML = "";
+  lista.replaceChildren();
   Estado.config.premios.forEach((premio) => {
     const cartao = document.createElement("div");
     cartao.className = "cartao-premio";
-    cartao.innerHTML = `
-      <input type="color" class="cartao-premio__cor" value="${premio.cor}" data-campo="cor" title="Cor (sorteada automaticamente, mas você pode ajustar)">
-      <input type="text" value="${premio.nome}" data-campo="nome" placeholder="Nome do prêmio">
-      <input type="text" value="${premio.categoria}" data-campo="categoria" placeholder="Categoria">
-      <select data-campo="positivo">
-        <option value="true" ${premio.positivo ? "selected" : ""}>Positivo</option>
-        <option value="false" ${!premio.positivo ? "selected" : ""}>Negativo</option>
-      </select>
-      <button class="botao-remover" title="Remover prêmio">Remover</button>
-    `;
+
+    const criarInput = (tipo, valor, campo, placeholder = "") => {
+      const input = document.createElement("input");
+      input.type = tipo;
+      input.value = valor;
+      input.dataset.campo = campo;
+      input.placeholder = placeholder;
+      return input;
+    };
+    const cor = criarInput("color", premio.cor, "cor");
+    cor.className = "cartao-premio__cor";
+    cor.title = "Cor do prêmio";
+    const nome = criarInput("text", premio.nome, "nome", "Nome do prêmio");
+    nome.maxLength = 80;
+    const categoria = criarInput("text", premio.categoria, "categoria", "Categoria");
+    categoria.maxLength = 60;
+    const positivo = document.createElement("select");
+    positivo.dataset.campo = "positivo";
+    [["true", "Positivo"], ["false", "Negativo"]].forEach(([valor, texto]) => {
+      const opcao = document.createElement("option");
+      opcao.value = valor;
+      opcao.textContent = texto;
+      opcao.selected = premio.positivo === (valor === "true");
+      positivo.appendChild(opcao);
+    });
+    const remover = document.createElement("button");
+    remover.className = "botao-remover";
+    remover.title = "Remover prêmio";
+    remover.textContent = "Remover";
+    cartao.append(cor, nome, categoria, positivo, remover);
 
     cartao.querySelectorAll("[data-campo]").forEach((campo) => {
       campo.addEventListener("input", () => {
@@ -87,7 +110,7 @@ function renderizarListaPremios() {
       });
     });
 
-    cartao.querySelector(".botao-remover").addEventListener("click", () => {
+    remover.addEventListener("click", () => {
       if (Estado.config.premios.length <= 2) { mostrarToast("A roleta precisa de pelo menos 2 prêmios."); return; }
       Estado.config.premios = Estado.config.premios.filter((p) => p.id !== premio.id);
       renderizarListaPremios();
@@ -135,6 +158,11 @@ function configurarUploadImagem(idInput, aoCarregar) {
   document.getElementById(idInput).addEventListener("change", (e) => {
     const arquivo = e.target.files[0];
     if (!arquivo) return;
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(arquivo.type) || arquivo.size > TAMANHO_MAX_UPLOAD) {
+      mostrarToast("Use PNG, JPEG, WebP ou GIF com no máximo 2 MB.");
+      e.target.value = "";
+      return;
+    }
     const leitor = new FileReader();
     leitor.onload = () => aoCarregar(leitor.result);
     leitor.readAsDataURL(arquivo);
@@ -157,6 +185,11 @@ function configurarSons() {
     document.getElementById(idInput).addEventListener("change", (e) => {
       const arquivo = e.target.files[0];
       if (!arquivo) return;
+      if (!/^audio\/(mpeg|mp3|wav|ogg|webm|mp4|x-m4a)$/.test(arquivo.type) || arquivo.size > TAMANHO_MAX_UPLOAD) {
+        mostrarToast("Use MP3, WAV, OGG, WebM ou M4A com no máximo 2 MB.");
+        e.target.value = "";
+        return;
+      }
       const leitor = new FileReader();
       leitor.onload = () => {
         Estado.config.sons[info.chave] = leitor.result;
@@ -245,30 +278,46 @@ async function carregarPerfilNaTela(nome, ativarNoTopo) {
 function renderizarListaPerfis() {
   const lista = document.getElementById("listaPerfis");
   const nomes = Object.keys(Perfis);
-  lista.innerHTML = "";
+  lista.replaceChildren();
   if (nomes.length === 0) {
-    lista.innerHTML = `<p class="painel__dica">Nenhum perfil salvo ainda. Monte o layout nas outras abas e salve aqui com um nome.</p>`;
+    const vazio = document.createElement("p");
+    vazio.className = "painel__dica";
+    vazio.textContent = "Nenhum perfil salvo ainda. Monte o layout nas outras abas e salve aqui com um nome.";
+    lista.appendChild(vazio);
     return;
   }
   nomes.forEach((nome) => {
     const ehAtivo = nome === Estado.nomePerfilAtivo && Estado._ehPerfilPublicadoAgora;
     const cartao = document.createElement("div");
     cartao.className = "cartao-perfil" + (ehAtivo ? " ativo" : "");
-    cartao.innerHTML = `
-      <span class="cartao-perfil__nome">${nome}${ehAtivo ? '<span class="cartao-perfil__selo">ATIVO</span>' : ""}</span>
-      <div class="cartao-perfil__acoes">
-        <button class="botao-secundario" data-acao="carregar">Carregar para editar</button>
-        <button class="botao-remover" data-acao="excluir">Excluir</button>
-      </div>
-    `;
-    cartao.querySelector('[data-acao="carregar"]').addEventListener("click", async () => {
+    const rotulo = document.createElement("span");
+    rotulo.className = "cartao-perfil__nome";
+    rotulo.textContent = nome;
+    if (ehAtivo) {
+      const selo = document.createElement("span");
+      selo.className = "cartao-perfil__selo";
+      selo.textContent = "ATIVO";
+      rotulo.appendChild(selo);
+    }
+    const acoes = document.createElement("div");
+    acoes.className = "cartao-perfil__acoes";
+    const carregar = document.createElement("button");
+    carregar.className = "botao-secundario";
+    carregar.textContent = "Carregar para editar";
+    const excluir = document.createElement("button");
+    excluir.className = "botao-remover";
+    excluir.textContent = "Excluir";
+    acoes.append(carregar, excluir);
+    cartao.append(rotulo, acoes);
+
+    carregar.addEventListener("click", async () => {
       let dados;
       try { dados = await buscarConfigAtivoRemoto(); } catch (e) { dados = null; }
       const publicadoAgora = !!(dados && dados.nome === nome);
       carregarPerfilNaTela(nome, publicadoAgora);
       mostrarToast(`Perfil "${nome}" carregado para edição.`);
     });
-    cartao.querySelector('[data-acao="excluir"]').addEventListener("click", async () => {
+    excluir.addEventListener("click", async () => {
       if (!confirm(`Excluir o perfil "${nome}"? Essa ação não pode ser desfeita.`)) return;
       try {
         await excluirPerfilRemoto(nome);
@@ -291,7 +340,13 @@ function renderizarListaPerfis() {
 function configurarConfiguracoesGerais() {
   document.getElementById("inputUrlWebhook").addEventListener("change", (e) => {
     window.CONFIG_PADRAO.webhook.url = e.target.value.trim();
-    mostrarToast("URL aplicada neste navegador para teste. Lembre-se de editar config.js para valer para todos.");
+    if (!obterUrlBackend()) {
+      mostrarToast("Use uma URL HTTPS válida de implantação do Google Apps Script terminada em /exec.");
+      e.target.value = "";
+      return;
+    }
+    e.target.value = obterUrlBackend();
+    mostrarToast("URL aplicada nesta aba para teste. Edite config.js para valer para todos.");
   });
   document.getElementById("inputDuracaoGiro").addEventListener("input", (e) => {
     Estado.config.roleta.duracaoGiroMs = Math.round(Number(e.target.value) * 1000);
@@ -314,7 +369,9 @@ function configurarConfiguracoesGerais() {
     const leitor = new FileReader();
     leitor.onload = () => {
       try {
-        Estado.config = JSON.parse(leitor.result);
+        const importada = JSON.parse(leitor.result);
+        validarConfiguracao(importada);
+        Estado.config = importada;
         Estado.nomePerfilAtivo = "";
         Estado._ehPerfilPublicadoAgora = false;
         preencherCampos();
@@ -322,7 +379,7 @@ function configurarConfiguracoesGerais() {
         Roleta.desenhar(Estado.anguloAtual);
         mostrarToast("Configuração importada — dê um nome e salve para adicionar à biblioteca.");
       } catch (erro) {
-        mostrarToast("Arquivo JSON inválido.");
+        mostrarToast("Configuração inválida: " + erro.message);
       }
     };
     leitor.readAsText(arquivo);
@@ -342,7 +399,7 @@ const HistoricoEstatisticas = {
 
   _renderizarTabela(linhas) {
     const corpo = document.getElementById("corpoHistorico");
-    corpo.innerHTML = "";
+    corpo.replaceChildren();
     linhas.forEach((registro) => {
       const tr = document.createElement("tr");
       const celula = (texto) => { const td = document.createElement("td"); td.textContent = texto; return td; };
@@ -416,20 +473,17 @@ function preencherCampos() {
   carregarSonsNosElementos(c);
 }
 
-async function iniciarAplicacao() {
+async function iniciarPainel() {
+  // Carrega primeiro para que uma falha de backend não registre listeners
+  // duplicados quando o usuário tentar entrar novamente.
+  Perfis = await listarPerfisRemoto();
+
   configurarAbas();
   configurarPremios();
   configurarVisual();
   configurarSons();
   configurarPerfis();
   configurarConfiguracoesGerais();
-
-  try {
-    Perfis = await listarPerfisRemoto();
-  } catch (erro) {
-    console.warn("Não foi possível carregar a biblioteca de perfis:", erro);
-    mostrarToast("Backend indisponível — configure a URL na aba Configurações.");
-  }
 
   let ativo = null;
   try { ativo = await buscarConfigAtivoRemoto(); } catch (e) { /* segue sem ativo */ }
@@ -456,4 +510,58 @@ async function iniciarAplicacao() {
   HistoricoEstatisticas.atualizar();
 }
 
-document.addEventListener("DOMContentLoaded", iniciarAplicacao);
+function configurarLoginAdmin() {
+  const tela = document.getElementById("telaLoginAdmin");
+  const formulario = document.getElementById("formLoginAdmin");
+  const input = document.getElementById("inputSegredoAdmin");
+  const erro = document.getElementById("erroLoginAdmin");
+  const botao = document.getElementById("btnEntrarAdmin");
+
+  const entrar = async (segredo) => {
+    botao.disabled = true;
+    erro.classList.add("oculto");
+    try {
+      await autenticarAdminRemoto(segredo);
+      sessionStorage.setItem(CHAVE_SESSAO_ADMIN, segredo);
+      tela.classList.add("oculto");
+      const painel = document.getElementById("painelAdmin");
+      painel.removeAttribute("inert");
+      painel.setAttribute("aria-hidden", "false");
+      await iniciarPainel();
+    } catch (falha) {
+      configurarCredencialAdmin("");
+      sessionStorage.removeItem(CHAVE_SESSAO_ADMIN);
+      erro.textContent = falha.message;
+      erro.classList.remove("oculto");
+      tela.classList.remove("oculto");
+      const painel = document.getElementById("painelAdmin");
+      painel.setAttribute("inert", "");
+      painel.setAttribute("aria-hidden", "true");
+      input.focus();
+    } finally {
+      botao.disabled = false;
+    }
+  };
+
+  formulario.addEventListener("submit", (evento) => {
+    evento.preventDefault();
+    entrar(input.value);
+  });
+
+  document.getElementById("btnSairAdmin").addEventListener("click", () => {
+    configurarCredencialAdmin("");
+    sessionStorage.removeItem(CHAVE_SESSAO_ADMIN);
+    location.reload();
+  });
+
+  const salvo = sessionStorage.getItem(CHAVE_SESSAO_ADMIN);
+  if (salvo) {
+    input.value = salvo;
+    entrar(salvo);
+  } else {
+    tela.classList.remove("oculto");
+    input.focus();
+  }
+}
+
+document.addEventListener("DOMContentLoaded", configurarLoginAdmin);

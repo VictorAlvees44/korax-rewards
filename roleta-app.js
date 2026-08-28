@@ -7,9 +7,8 @@
  */
 import {
   Estado, Roleta, Confete,
-  obterConfigParaExibir, registrarGiroRemoto, tentarReenviarPendentes,
-  sortearPremioAleatorio, girarRoleta,
-  adicionarHistorico, formatarDataHora, mostrarToast,
+  obterConfigParaExibir, sortearGiroRemoto, gerarIdSeguro, girarRoleta,
+  adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela
 } from "./core.js";
 
@@ -62,35 +61,52 @@ async function iniciarFluxoDeGiro(nomeParticipante) {
   Estado.girando = true;
 
   document.getElementById("btnGirar").disabled = true;
-  tocarSom("audioGiro");
+  mostrarToast("Confirmando e registrando o giro…");
 
-  const premioEscolhido = sortearPremioAleatorio(Estado.config.premios);
-  const duracaoMs = (Estado.config.roleta && Estado.config.roleta.duracaoGiroMs) || 4800;
+  try {
+    const idGiro = gerarIdSeguro();
+    let registro;
+    try {
+      registro = await sortearGiroRemoto(nomeParticipante, idGiro);
+    } catch (primeiroErro) {
+      // A mesma chave torna a repetição segura caso o servidor tenha gravado,
+      // mas a primeira resposta tenha se perdido.
+      registro = await sortearGiroRemoto(nomeParticipante, idGiro);
+    }
 
-  girarRoleta(premioEscolhido, duracaoMs, () => {
-    finalizarGiro(premioEscolhido, nomeParticipante);
-  });
+    const premioEscolhido = registro.premio;
+    if (Array.isArray(registro.premios) && registro.premios.length >= 2) {
+      Estado.config.premios = registro.premios;
+    } else if (!Estado.config.premios.some((p) => p.id === premioEscolhido.id)) {
+      Estado.config.premios = [premioEscolhido, ...Estado.config.premios];
+    }
+    Estado.nomePerfilAtivo = registro.perfil;
+    Roleta.desenhar(Estado.anguloAtual);
+    tocarSom("audioGiro");
+    const duracaoMs = (Estado.config.roleta && Estado.config.roleta.duracaoGiroMs) || 4800;
+    girarRoleta(premioEscolhido, duracaoMs, () => finalizarGiro(registro));
+  } catch (erro) {
+    Estado.girando = false;
+    document.getElementById("btnGirar").disabled = false;
+    mostrarToast("Giro não realizado: " + erro.message);
+  }
 }
 
-async function finalizarGiro(premio, nomeParticipante) {
+function finalizarGiro(registroRemoto) {
+  const premio = registroRemoto.premio;
+  const nomeParticipante = registroRemoto.nome;
   pararSom("audioGiro");
   tocarSom("audioParada");
 
-  const agora = new Date();
-  const { data, hora } = formatarDataHora(agora);
-
   const registro = {
+    idGiro: registroRemoto.idGiro,
     nome: nomeParticipante,
     premio: premio.nome,
     tipo: premio.positivo ? "positivo" : "negativo",
-    perfil: Estado.nomePerfilAtivo || "Padrão",
-    data, hora
+    perfil: registroRemoto.perfil,
+    data: registroRemoto.data,
+    hora: registroRemoto.hora
   };
-
-  const resultadoEnvio = await registrarGiroRemoto(registro);
-  if (!resultadoEnvio.ok) {
-    mostrarToast("Giro registrado localmente. Reenviaremos à planilha automaticamente.");
-  }
 
   adicionarHistorico(registro);
 
@@ -139,8 +155,6 @@ async function iniciarAplicacao() {
     ModalNome.abrir();
   });
 
-  tentarReenviarPendentes();
-  window.addEventListener("online", tentarReenviarPendentes);
 }
 
 document.addEventListener("DOMContentLoaded", iniciarAplicacao);
