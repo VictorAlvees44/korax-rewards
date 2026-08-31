@@ -22,7 +22,7 @@
  */
 window.CONFIG_PADRAO = {
   empresa: {
-    nome: "Sua Empresa",
+    nome: "Korax",
     tituloRoleta: "Roleta da Sorte",
     logoUrl: "",
     planoFundoUrl: "",
