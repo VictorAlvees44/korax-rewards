@@ -492,7 +492,7 @@ input, select { font-family: inherit; }
 
 .cartao-premio {
   display: grid;
-  grid-template-columns: 48px 1.6fr 1fr 1fr auto;
+  grid-template-columns: 48px minmax(0, 1fr) minmax(130px, 0.42fr) auto;
   gap: 12px;
   align-items: center;
   background: rgba(255,255,255,0.04);
@@ -510,7 +510,6 @@ input, select { font-family: inherit; }
   padding: 0;
 }
 
-.cartao-premio__descricao { grid-column: 2 / -1; }
 .resumo-premios { color: var(--cor-primaria-clara); font-weight: 600; }
 .status-edicao { color: var(--cor-texto-suave); font-size: 0.9rem; margin: 0; line-height: 1.5; }
 .cartao-premio button:disabled, #btnAdicionarPremio:disabled { cursor: not-allowed; opacity: 0.5; }
@@ -522,6 +521,7 @@ input, select { font-family: inherit; }
   padding: 8px 10px;
   color: var(--cor-texto);
   width: 100%;
+  min-width: 0;
 }
 
 .botao-remover {
@@ -631,9 +631,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 @media (max-width: 720px) {
   .topo { flex-direction: column; gap: 4px; padding-top: 16px; }
   .botao-icone { top: 12px; right: 12px; }
-  .cartao-premio { grid-template-columns: 1fr 1fr; grid-auto-rows: auto; }
-  .cartao-premio__cor { grid-row: span 2; }
-  .cartao-premio__descricao { grid-column: 1 / -1; }
+  .painel { padding: 28px 14px 72px; }
+  .cartao-premio { grid-template-columns: 48px minmax(0, 1fr); grid-auto-rows: auto; }
+  .cartao-premio__cor { grid-row: 1 / span 2; }
+  .cartao-premio select { grid-column: 2; }
+  .cartao-premio .botao-remover { grid-column: 1 / -1; }
 }
 
 @media (min-width: 1000px) and (min-height: 700px) {

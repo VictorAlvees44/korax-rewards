@@ -74,7 +74,7 @@ Os sons padrão versionados em `assets/audio/` são: `roleta-girando.mp3` durant
 
 ## Uso pelo comercial: prêmios, cores e chances
 
-1. Entre no admin e abra **Prêmios**. Edite nome, categoria, tipo (positivo/negativo) e mensagem do resultado.
+1. Entre no admin e abra **Prêmios**. Edite o título e escolha o tipo (positivo/negativo). Categoria e mensagem não aparecem no formulário, mantendo o cadastro simples para o comercial.
 2. Clique em **Adicionar prêmio** para criar um resultado com uma cor aleatória ainda não usada. Cada perfil aceita de 2 a 50 resultados.
 3. Para trocar uma cor, clique em **↻**. A nova cor também exclui todas as cores atuais, inclusive a que está sendo substituída. Não há seletor manual de cores dos prêmios.
 4. **Testar giro** apenas anima a prévia, sem criar registros na planilha. A edição fica bloqueada durante a animação para não mudar os prêmios no meio do teste.

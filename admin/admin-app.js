@@ -59,7 +59,7 @@ function configurarPremios() {
     if (Estado.config.premios.length >= 50) { mostrarToast("Cada perfil aceita no máximo 50 prêmios."); return; }
     Estado.config.premios.push({
       id: gerarId(), nome: "Novo prêmio", cor: gerarCorAleatoria(Estado.config.premios.map((p) => p.cor)),
-      categoria: "Brinde", descricao: "", positivo: true, som: ""
+      categoria: "", descricao: "", positivo: true, som: ""
     });
     marcarEdicaoPremios();
     renderizarListaPremios();
@@ -127,8 +127,6 @@ function renderizarListaPremios() {
     });
     const nome = criarInput("text", premio.nome, "nome", "Nome do prêmio");
     nome.maxLength = 80;
-    const categoria = criarInput("text", premio.categoria, "categoria", "Categoria");
-    categoria.maxLength = 60;
     const positivo = document.createElement("select");
     positivo.dataset.campo = "positivo";
     positivo.setAttribute("aria-label", `Tipo do resultado — prêmio ${indice + 1}`);
@@ -144,10 +142,7 @@ function renderizarListaPremios() {
     remover.title = `Remover prêmio ${indice + 1}`;
     remover.setAttribute("aria-label", remover.title);
     remover.textContent = "Remover";
-    const descricao = criarInput("text", premio.descricao || "", "descricao", "Mensagem do resultado");
-    descricao.maxLength = 240;
-    descricao.className = "cartao-premio__descricao";
-    cartao.append(cor, nome, categoria, positivo, remover, descricao);
+    cartao.append(cor, nome, positivo, remover);
 
     cartao.querySelectorAll("[data-campo]").forEach((campo) => {
       campo.addEventListener("input", () => {
