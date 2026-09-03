@@ -23,7 +23,10 @@ const arquivos = new Map([
   ["/config.js", ["config.js", "text/javascript"]],
   ["/core.js", ["core.js", "text/javascript"]],
   ["/roleta-app.js", ["roleta-app.js", "text/javascript"]],
-  ["/admin/admin-app.js", ["admin/admin-app.js", "text/javascript"]]
+  ["/admin/admin-app.js", ["admin/admin-app.js", "text/javascript"]],
+  ["/assets/audio/naruto-sad.mp3", ["assets/audio/naruto-sad.mp3", "audio/mpeg", true]],
+  ["/assets/audio/palmas.mp3", ["assets/audio/palmas.mp3", "audio/mpeg", true]],
+  ["/assets/audio/roleta-girando.mp3", ["assets/audio/roleta-girando.mp3", "audio/mpeg", true]]
 ]);
 
 const servidor = createServer(async (req, res) => {
@@ -64,7 +67,7 @@ const servidor = createServer(async (req, res) => {
     }
     const arquivo = arquivos.get(url.pathname);
     if (!arquivo) { res.writeHead(404); res.end("Não encontrado"); return; }
-    let conteudo = await readFile(new URL(arquivo[0], raiz), "utf8");
+    let conteudo = await readFile(new URL(arquivo[0], raiz), arquivo[2] ? undefined : "utf8");
     if (arquivo[0] === "core.js") {
       const original = "await fetch(url, { ...opcoes, signal: controlador.signal })";
       if (!conteudo.includes(original)) throw new Error("O adaptador de QA precisa acompanhar a implementação do cliente.");

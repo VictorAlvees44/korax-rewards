@@ -9,6 +9,12 @@ test("a configuração padrão é válida", () => {
   assert.equal(validarConfiguracao(config), true);
 });
 
+test("a configuração associa os três sons aos eventos corretos", () => {
+  assert.equal(config.sons.giro, "assets/audio/roleta-girando.mp3");
+  assert.equal(config.sons.vitoria, "assets/audio/palmas.mp3");
+  assert.equal(config.sons.derrota, "assets/audio/naruto-sad.mp3");
+});
+
 test("rejeita IDs de prêmio duplicados", () => {
   const invalida = structuredClone(config);
   invalida.premios[1].id = invalida.premios[0].id;

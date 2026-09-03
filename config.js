@@ -31,9 +31,9 @@ window.CONFIG_PADRAO = {
     fonte: "Sora"
   },
   sons: {
-    giro: "",
-    vitoria: "",
-    derrota: "",
+    giro: "assets/audio/roleta-girando.mp3",
+    vitoria: "assets/audio/palmas.mp3",
+    derrota: "assets/audio/naruto-sad.mp3",
     clique: "",
     parada: ""
   },

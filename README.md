@@ -70,6 +70,8 @@ Em seguida abra `SUA_URL/exec?acao=configAtivo`. Antes do primeiro perfil public
 
 Uploads individuais de imagem ou áudio são limitados a 2 MB. O perfil completo não pode ultrapassar 8 MB. SVG não é aceito, reduzindo risco de conteúdo ativo.
 
+Os sons padrão versionados em `assets/audio/` são: `roleta-girando.mp3` durante o giro, `palmas.mp3` para resultados positivos e `naruto-sad.mp3` para resultados negativos. O áudio de giro é interrompido antes de tocar o som do resultado.
+
 ## Uso pelo comercial: prêmios, cores e chances
 
 1. Entre no admin e abra **Prêmios**. Edite nome, categoria, tipo (positivo/negativo) e mensagem do resultado.

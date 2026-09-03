@@ -375,7 +375,9 @@ export function carregarSonsNosElementos(config) {
   Object.entries(mapa).forEach(([chave, idAudio]) => {
     const el = document.getElementById(idAudio);
     if (!el) return;
-    if (s[chave]) el.src = s[chave];
+    // Caminhos relativos partem da raiz do projeto (onde core.js fica),
+    // inclusive quando este módulo é usado pela página /admin/.
+    if (s[chave]) el.src = new URL(s[chave], import.meta.url).href;
     else el.removeAttribute("src");
   });
 }
