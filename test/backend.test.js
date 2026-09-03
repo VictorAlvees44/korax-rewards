@@ -52,7 +52,7 @@ test("a configuração do servidor descarta pesos legados", () => {
   assert.equal("peso" in normalizada.premios[0], false);
 });
 
-test("o prêmio e o perfil enviados pelo visitante não controlam o sorteio oficial", () => {
+test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {
   const ctx = backend();
   const linhas = [];
   let sorteios = 0;
@@ -71,7 +71,7 @@ test("o prêmio e o perfil enviados pelo visitante não controlam o sorteio ofic
 
   const resultado = ctx.sortearERegistrarGiro({
     idGiro: "1234567890abcdef", clienteId: "cliente-local", nome: "Teste local",
-    premio: "Prêmio inventado", perfil: "Perfil inventado", tipo: "negativo"
+    premio: "Prêmio inventado", tipo: "negativo"
   });
   assert.equal(resultado.dados.premio.id, config.premios[2].id);
   assert.equal(resultado.dados.perfil, "Comercial");
@@ -84,4 +84,32 @@ test("o prêmio e o perfil enviados pelo visitante não controlam o sorteio ofic
   assert.equal(repetido, resultado);
   assert.equal(linhas.length, 1);
   assert.equal(sorteios, 1);
+});
+
+test("o servidor sorteia somente dentro do perfil salvo que foi selecionado", () => {
+  const ctx = backend();
+  const perfilEscolhido = structuredClone(config);
+  perfilEscolhido.premios[0].nome = "Item exclusivo da feira";
+  ctx.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
+  ctx.buscarGiroNoControle = () => null;
+  ctx.aplicarLimiteDeGiros = () => {};
+  ctx.obterPerfilPublico = (nome) => {
+    assert.equal(nome, "Feira Korax");
+    return { nome, config: perfilEscolhido };
+  };
+  ctx.indiceAleatorioSeguro = () => 0;
+  ctx.Session = { getScriptTimeZone: () => "America/Sao_Paulo" };
+  ctx.Utilities.formatDate = (_, __, formato) => formato === "dd/MM/yyyy" ? "03/09/2026" : "12:00:00";
+  ctx.obterAbaDoLayoutNoMes = () => ({ appendRow() {}, getLastRow: () => 2, getName: () => "Feira Korax - 09-2026" });
+  ctx.garantirCabecalhoAtual = () => {};
+  ctx.obterAbaControle = () => ({ appendRow() {} });
+  ctx.enviarEmailNotificacao = () => {};
+  ctx.atualizarStatusEmail = () => {};
+
+  const resultado = ctx.sortearERegistrarGiro({
+    idGiro: "abcdef1234567890", clienteId: "cliente-local", nome: "Teste local", perfil: "Feira Korax",
+    premio: "Resultado forjado"
+  });
+  assert.equal(resultado.dados.perfil, "Feira Korax");
+  assert.equal(resultado.dados.premio.nome, "Item exclusivo da feira");
 });

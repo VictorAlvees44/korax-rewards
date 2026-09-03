@@ -19,6 +19,8 @@ function doGet(e) {
   try {
     var acao = (e && e.parameter && e.parameter.acao) || "saude";
     if (acao === "configAtivo") return respostaJson({ status: "sucesso", dados: obterConfigAtivo() });
+    if (acao === "perfisPublicos") return respostaJson(listarPerfisPublicos());
+    if (acao === "perfilPublico") return respostaJson({ status: "sucesso", dados: obterPerfilPublico(e.parameter.nome) });
     if (acao === "saude") {
       var props = PropertiesService.getScriptProperties();
       return respostaJson({
@@ -136,6 +138,34 @@ function listarPerfis() {
   return mapa;
 }
 
+function listarPerfisPublicos() {
+  var arquivos = obterPastaPerfis().getFiles();
+  var nomes = {};
+  while (arquivos.hasNext()) {
+    var arquivo = arquivos.next();
+    if (arquivo.getName().indexOf("perfil__") !== 0) continue;
+    try {
+      var dados = JSON.parse(arquivo.getBlob().getDataAsString());
+      nomes[validarNomePerfil(dados.nome)] = true;
+    } catch (ignorado) {}
+  }
+  var ativo = obterConfigAtivo();
+  if (ativo) nomes[ativo.nome] = true;
+  return { status: "sucesso", perfis: Object.keys(nomes).sort(), ativo: ativo ? ativo.nome : "" };
+}
+
+function obterPerfilPublico(nome) {
+  nome = validarNomePerfil(nome);
+  var arquivos = encontrarArquivosDoPerfil(obterPastaPerfis(), nome);
+  if (arquivos.length) {
+    var dados = JSON.parse(arquivos[0].getBlob().getDataAsString());
+    return { nome: nome, config: validarENormalizarConfig(dados.config, true) };
+  }
+  var ativo = obterConfigAtivo();
+  if (ativo && ativo.nome === nome) return { nome: nome, config: ativo.config };
+  throw new Error("Perfil não encontrado.");
+}
+
 function excluirPerfil(nome) {
   nome = validarNomePerfil(nome);
   var lock = LockService.getScriptLock();
@@ -191,8 +221,9 @@ function sortearERegistrarGiro(corpo) {
     if (existente) return respostaGiroExistente(existente);
 
     aplicarLimiteDeGiros(clienteId);
-    var ativo = obterConfigAtivo();
-    if (!ativo || !ativo.config || ativo.config.premios.length < 2) throw new Error("Nenhum perfil válido está publicado.");
+    var nomePerfil = normalizarTexto(corpo.perfil || "", "perfil", 80, false);
+    var ativo = nomePerfil ? obterPerfilPublico(nomePerfil) : obterConfigAtivo();
+    if (!ativo || !ativo.config || ativo.config.premios.length < 2) throw new Error("Nenhum perfil válido está disponível.");
 
     var premios = ativo.config.premios;
     var premio = premios[indiceAleatorioSeguro(premios.length)];

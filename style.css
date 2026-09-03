@@ -50,7 +50,8 @@ input, select { font-family: inherit; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background:
     radial-gradient(circle at 50% 15%, var(--cor-fundo-degrade-2), transparent 60%),
     linear-gradient(180deg, var(--cor-fundo-degrade-1), var(--cor-fundo) 70%);
@@ -68,25 +69,44 @@ input, select { font-family: inherit; }
 .topo {
   position: relative;
   z-index: 2;
-  width: 100%;
+  width: min(1440px, 100%);
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 20px 24px 6px;
+  justify-content: flex-start;
+  min-height: 86px;
+  padding: 14px 32px 6px;
+}
+
+.topo__marca {
+  min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 .topo__logo {
-  max-height: 52px;
+  display: block;
+  width: min(210px, 25vw);
+  max-height: 72px;
   object-fit: contain;
+  object-position: left center;
+}
+
+.topo__nome-empresa {
+  font-family: var(--fonte-display);
+  font-size: clamp(1rem, 2vw, 1.35rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cor-texto);
 }
 
 .topo__titulo {
   font-family: var(--fonte-display);
   font-weight: 800;
   letter-spacing: 0.04em;
-  font-size: clamp(1.4rem, 3vw, 2.2rem);
-  margin: 0;
+  font-size: clamp(1.05rem, 2.1vw, 1.65rem);
+  margin: 0 0 10px;
+  text-align: center;
   text-transform: uppercase;
   background: linear-gradient(90deg, var(--cor-primaria-clara), var(--cor-primaria));
   -webkit-background-clip: text;
@@ -110,22 +130,110 @@ input, select { font-family: inherit; }
 }
 .botao-icone:hover { background: rgba(201,162,39,0.18); box-shadow: var(--sombra-glow); }
 
-.arena {
+.experiencia-roleta {
   position: relative;
   z-index: 2;
   flex: 1;
+  width: min(1440px, 100%);
+  display: grid;
+  grid-template-columns: minmax(170px, 220px) minmax(440px, 1fr) minmax(170px, 210px);
+  gap: clamp(18px, 2.5vw, 38px);
+  align-items: center;
+  padding: 0 32px 24px;
+}
+
+.centro-roleta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-perfis,
+.perfil-selecionado {
+  width: 100%;
+  background: rgba(11, 18, 32, 0.76);
+  border: 1px solid var(--cor-borda);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 16px 42px rgba(0,0,0,0.28);
+  backdrop-filter: blur(10px);
+}
+
+.menu-perfis__rotulo,
+.perfil-selecionado > span {
+  display: block;
+  margin: 0 0 4px;
+  color: var(--cor-texto-suave);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.menu-perfis h2 {
+  margin: 0 0 12px;
+  font-family: var(--fonte-display);
+  color: var(--cor-primaria-clara);
+  font-size: 1rem;
+}
+
+.menu-perfis__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-perfis__botao {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  color: var(--cor-texto);
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  transition: var(--transicao);
+}
+
+.menu-perfis__botao:hover:not(:disabled) { border-color: var(--cor-primaria); background: rgba(201,162,39,0.12); }
+.menu-perfis__botao.ativo {
+  border-color: var(--cor-primaria-clara);
+  background: linear-gradient(135deg, rgba(232,199,102,0.24), rgba(201,162,39,0.08));
+  color: var(--cor-primaria-clara);
+  box-shadow: inset 3px 0 0 var(--cor-primaria-clara);
+}
+.menu-perfis__botao:disabled { cursor: wait; opacity: 0.58; }
+.menu-perfis__vazio { color: var(--cor-texto-suave); font-size: 0.8rem; margin: 0; }
+
+.perfil-selecionado strong {
+  display: block;
+  margin: 6px 0 8px;
+  font-family: var(--fonte-display);
+  color: var(--cor-primaria-clara);
+  font-size: 0.98rem;
+  overflow-wrap: anywhere;
+}
+.perfil-selecionado p { margin: 0; color: var(--cor-texto-suave); font-size: 0.78rem; line-height: 1.5; }
+
+.arena {
+  position: relative;
+  z-index: 2;
+  flex: 0 1 auto;
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 12px 16px 28px;
-  gap: 22px;
+  padding: 0;
 }
 
 .arena__roleta-wrap {
   position: relative;
-  width: min(78vh, 82vw, 640px);
+  width: min(78vh, 100%, 720px);
   aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
@@ -156,8 +264,8 @@ input, select { font-family: inherit; }
 
 .cubo-central {
   position: absolute;
-  width: 22%;
-  height: 22%;
+  width: 24%;
+  height: 24%;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, var(--cor-primaria-clara), var(--cor-primaria) 60%, #7c621a 100%);
   display: flex;
@@ -165,11 +273,11 @@ input, select { font-family: inherit; }
   justify-content: center;
   font-family: var(--fonte-display);
   font-weight: 800;
-  font-size: clamp(0.7rem, 1.4vw, 1rem);
+  font-size: clamp(0.72rem, 1.35vw, 1.05rem);
   color: #14100a;
   letter-spacing: 0.06em;
-  box-shadow: 0 0 30px rgba(201,162,39,0.55), inset 0 2px 6px rgba(255,255,255,0.4);
-  border: 3px solid rgba(255,255,255,0.35);
+  box-shadow: 0 0 34px rgba(201,162,39,0.62), inset 0 2px 6px rgba(255,255,255,0.45);
+  border: 4px solid rgba(255,255,255,0.58);
   z-index: 4;
   overflow: hidden;
   padding: 0;
@@ -628,9 +736,24 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
 /* ============================= RESPONSIVO ==============================*/
 
+@media (max-width: 1180px) {
+  .experiencia-roleta { grid-template-columns: minmax(150px, 190px) minmax(400px, 1fr); }
+  .perfil-selecionado { display: none; }
+}
+
 @media (max-width: 720px) {
-  .topo { flex-direction: column; gap: 4px; padding-top: 16px; }
+  .topo { min-height: 70px; padding: 12px 14px 4px; }
+  .topo__logo { width: min(170px, 48vw); max-height: 58px; }
   .botao-icone { top: 12px; right: 12px; }
+  .experiencia-roleta { display: flex; flex-direction: column; gap: 16px; padding: 8px 14px 24px; }
+  .menu-perfis { order: 2; padding: 12px; }
+  .menu-perfis__rotulo, .menu-perfis h2 { display: none; }
+  .menu-perfis__lista { flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
+  .menu-perfis__botao { width: auto; flex: 0 0 auto; max-width: 210px; }
+  .centro-roleta { order: 1; width: 100%; }
+  .topo__titulo { margin-bottom: 12px; font-size: clamp(1rem, 5vw, 1.35rem); }
+  .arena__roleta-wrap { width: min(70vh, 94vw, 620px); }
+  .ponteiro { border-left-width: 15px; border-right-width: 15px; border-top-width: 26px; }
   .painel { padding: 28px 14px 72px; }
   .cartao-premio { grid-template-columns: 48px minmax(0, 1fr); grid-auto-rows: auto; }
   .cartao-premio__cor { grid-row: 1 / span 2; }
@@ -639,5 +762,5 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 
 @media (min-width: 1000px) and (min-height: 700px) {
-  .arena__roleta-wrap { width: min(70vh, 620px); }
+  .arena__roleta-wrap { width: min(76vh, 100%, 720px); }
 }

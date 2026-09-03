@@ -41,6 +41,12 @@ const botoesGirar = [...paginaPublica.matchAll(/id="btnGirar"/g)];
 if (botoesGirar.length !== 1 || !/<button[^>]+id="btnGirar"[^>]*>[\s\S]*?GIRAR[\s\S]*?<\/button>/.test(paginaPublica)) {
   throw new Error("A página pública deve possuir um único botão central de giro.");
 }
+if (!paginaPublica.includes('id="listaPerfisPublicos"') || !paginaPublica.includes('id="nomePerfilSelecionado"')) {
+  throw new Error("A página pública deve manter o menu lateral de perfis.");
+}
+if (!/acao === "perfisPublicos"/.test(gas) || !/acao === "perfilPublico"/.test(gas)) {
+  throw new Error("O backend deve expor os perfis usados pelo menu público.");
+}
 
 const codigoCliente = arquivosJs.map((arquivo) => readFileSync(resolve(raiz, arquivo), "utf8")).join("\n");
 if (/\.innerHTML\s*=|insertAdjacentHTML|document\.write\s*\(|\beval\s*\(/.test(codigoCliente)) {

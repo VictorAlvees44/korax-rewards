@@ -11,7 +11,10 @@ vm.runInContext(codigo, contexto);
 const inicial = JSON.parse(await readFile(new URL("config.json", raiz), "utf8"));
 // Exercita a migração de cores de um perfil legado.
 inicial.premios[1].cor = inicial.premios[0].cor.toLowerCase();
-const perfis = new Map([["Teste local", inicial]]);
+const alternativo = structuredClone(inicial);
+alternativo.empresa.tituloRoleta = "Roleta da Convenção";
+alternativo.premios = alternativo.premios.slice(0, 4);
+const perfis = new Map([["Teste local", inicial], ["Convenção Korax", alternativo]]);
 let ativo = { nome: "Teste local", config: structuredClone(inicial) };
 const arquivos = new Map([
   ["/", ["index.html", "text/html"]],
@@ -40,6 +43,17 @@ const servidor = createServer(async (req, res) => {
     if (url.pathname === "/__test/backend") {
       if (req.method === "GET" && url.searchParams.get("acao") === "configAtivo") {
         responder({ status: "sucesso", dados: ativo });
+        return;
+      }
+      if (req.method === "GET" && url.searchParams.get("acao") === "perfisPublicos") {
+        responder({ status: "sucesso", perfis: [...perfis.keys()].sort(), ativo: ativo.nome });
+        return;
+      }
+      if (req.method === "GET" && url.searchParams.get("acao") === "perfilPublico") {
+        const nome = url.searchParams.get("nome");
+        const config = perfis.get(nome);
+        if (!config) throw new Error("Perfil não encontrado.");
+        responder({ status: "sucesso", dados: { nome, config } });
         return;
       }
       let corpo = "";

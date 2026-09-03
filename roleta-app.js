@@ -7,10 +7,89 @@
  */
 import {
   Estado, Roleta, Confete,
-  obterConfigParaExibir, sortearGiroRemoto, gerarIdSeguro, girarRoleta,
+  obterConfigParaExibir, listarPerfisPublicosRemoto, buscarPerfilPublicoRemoto,
+  sortearGiroRemoto, gerarIdSeguro, girarRoleta, validarConfiguracao,
   adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela
-} from "./core.js?v=20260903-sons";
+} from "./core.js?v=20260903-layout";
+
+let trocandoPerfil = false;
+
+function atualizarResumoPerfil() {
+  const nome = Estado.nomePerfilAtivo || "Roleta principal";
+  const quantidade = Estado.config?.premios?.length || 0;
+  document.getElementById("nomePerfilSelecionado").textContent = nome;
+  document.getElementById("resumoPerfilSelecionado").textContent = quantidade
+    ? `${quantidade} resultados • chance de 1 em ${quantidade} para cada item`
+    : "Todos os resultados têm a mesma chance.";
+}
+
+function marcarPerfilSelecionado() {
+  document.querySelectorAll(".menu-perfis__botao").forEach((botao) => {
+    const selecionado = botao.dataset.perfil === Estado.nomePerfilAtivo;
+    botao.classList.toggle("ativo", selecionado);
+    botao.setAttribute("aria-current", selecionado ? "true" : "false");
+  });
+  atualizarResumoPerfil();
+}
+
+async function selecionarPerfil(nome) {
+  if (Estado.girando || trocandoPerfil || nome === Estado.nomePerfilAtivo) return;
+  trocandoPerfil = true;
+  const botoes = Array.from(document.querySelectorAll(".menu-perfis__botao"));
+  botoes.forEach((botao) => { botao.disabled = true; });
+  try {
+    const perfil = await buscarPerfilPublicoRemoto(nome);
+    if (!perfil?.config) throw new Error("Perfil indisponível.");
+    validarConfiguracao(perfil.config, { permitirCoresRepetidas: true });
+    Estado.config = perfil.config;
+    Estado.nomePerfilAtivo = perfil.nome;
+    Estado.anguloAtual = 0;
+    aplicarVisualNaTela(Estado.config);
+    carregarSonsNosElementos(Estado.config);
+    Roleta.desenhar(Estado.anguloAtual);
+    marcarPerfilSelecionado();
+    mostrarToast(`Roleta "${perfil.nome}" selecionada.`);
+  } catch (erro) {
+    mostrarToast("Não foi possível carregar o perfil: " + erro.message);
+  } finally {
+    trocandoPerfil = false;
+    botoes.forEach((botao) => { botao.disabled = false; });
+  }
+}
+
+function renderizarMenuPerfis(nomes) {
+  const lista = document.getElementById("listaPerfisPublicos");
+  lista.replaceChildren();
+  const unicos = [...new Set([Estado.nomePerfilAtivo, ...nomes].filter(Boolean))];
+  unicos.forEach((nome) => {
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "menu-perfis__botao";
+    botao.dataset.perfil = nome;
+    botao.textContent = nome;
+    botao.addEventListener("click", () => selecionarPerfil(nome));
+    lista.appendChild(botao);
+  });
+  if (!unicos.length) {
+    const vazio = document.createElement("p");
+    vazio.className = "menu-perfis__vazio";
+    vazio.textContent = "Nenhum perfil disponível.";
+    lista.appendChild(vazio);
+  }
+  marcarPerfilSelecionado();
+}
+
+async function carregarMenuPerfis() {
+  try {
+    const dados = await listarPerfisPublicosRemoto();
+    renderizarMenuPerfis(dados.perfis);
+  } catch (erro) {
+    // Compatibilidade temporária com uma implantação antiga do Apps Script:
+    // mantém o perfil ativo visível até o backend novo ser publicado.
+    renderizarMenuPerfis([]);
+  }
+}
 
 const ModalNome = {
   el: null, input: null, erro: null,
@@ -67,11 +146,11 @@ async function iniciarFluxoDeGiro(nomeParticipante) {
     const idGiro = gerarIdSeguro();
     let registro;
     try {
-      registro = await sortearGiroRemoto(nomeParticipante, idGiro);
+      registro = await sortearGiroRemoto(nomeParticipante, idGiro, Estado.nomePerfilAtivo);
     } catch (primeiroErro) {
       // A mesma chave torna a repetição segura caso o servidor tenha gravado,
       // mas a primeira resposta tenha se perdido.
-      registro = await sortearGiroRemoto(nomeParticipante, idGiro);
+      registro = await sortearGiroRemoto(nomeParticipante, idGiro, Estado.nomePerfilAtivo);
     }
 
     const premioEscolhido = registro.premio;
@@ -142,12 +221,14 @@ async function iniciarAplicacao() {
 
   aplicarVisualNaTela(Estado.config);
   carregarSonsNosElementos(Estado.config);
+  atualizarResumoPerfil();
 
   Roleta.iniciar("canvasRoleta");
   Confete.iniciar();
   ModalNome.iniciar();
   ModalResultado.iniciar();
   configurarTelaCheia();
+  carregarMenuPerfis();
 
   document.getElementById("btnGirar").addEventListener("click", () => {
     if (Estado.girando) return;

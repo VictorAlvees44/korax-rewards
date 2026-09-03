@@ -9,7 +9,7 @@
 <meta name="description" content="Roleta da sorte corporativa para campanhas comerciais e eventos">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Poppins:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260903-layout">
 </head>
 <body>
 
@@ -19,20 +19,39 @@
   <div class="palco__fundo" id="fundoPersonalizado" aria-hidden="true"></div>
 
   <header class="topo">
-    <img id="logoEmpresa" class="topo__logo oculto" alt="Logo da empresa">
-    <h1 class="topo__titulo" id="topoTitulo">Roleta da Sorte</h1>
+    <div class="topo__marca">
+      <img id="logoEmpresa" class="topo__logo oculto" alt="Logo da empresa">
+      <span id="nomeEmpresaTopo" class="topo__nome-empresa">Korax</span>
+    </div>
     <button id="btnTelaCheia" class="botao-icone" title="Tela cheia" aria-label="Alternar tela cheia">⛶</button>
   </header>
 
-  <div class="arena">
-    <div class="arena__roleta-wrap">
-      <div class="ponteiro" aria-hidden="true"></div>
-      <canvas id="canvasRoleta" width="640" height="640" aria-label="Roleta de prêmios"></canvas>
-      <button id="btnGirar" class="cubo-central" type="button" aria-label="Girar roleta">
-        <img id="logoCentral" class="cubo-central__logo oculto" alt="Logo da empresa">
-        <span id="textoCentral">GIRAR</span>
-      </button>
-    </div>
+  <div class="experiencia-roleta">
+    <aside class="menu-perfis" aria-labelledby="tituloMenuPerfis">
+      <p class="menu-perfis__rotulo">Roletas disponíveis</p>
+      <h2 id="tituloMenuPerfis">Perfis salvos</h2>
+      <div id="listaPerfisPublicos" class="menu-perfis__lista" role="navigation" aria-label="Escolher perfil de roleta"></div>
+    </aside>
+
+    <main class="centro-roleta">
+      <h1 class="topo__titulo" id="topoTitulo">Roleta da Sorte</h1>
+      <div class="arena">
+        <div class="arena__roleta-wrap">
+          <div class="ponteiro" aria-hidden="true"></div>
+          <canvas id="canvasRoleta" width="720" height="720" aria-label="Roleta de prêmios"></canvas>
+          <button id="btnGirar" class="cubo-central" type="button" aria-label="Girar roleta">
+            <img id="logoCentral" class="cubo-central__logo oculto" alt="Logo da empresa">
+            <span id="textoCentral">GIRAR</span>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <aside class="perfil-selecionado" aria-live="polite">
+      <span>Perfil selecionado</span>
+      <strong id="nomePerfilSelecionado">Carregando…</strong>
+      <p id="resumoPerfilSelecionado">Todos os resultados têm a mesma chance.</p>
+    </aside>
   </div>
 </section>
 
@@ -74,6 +93,6 @@
 <audio id="audioParada"></audio>
 
 <script src="config.js?v=20260903-sons"></script>
-<script src="roleta-app.js?v=20260903-sons" type="module"></script>
+<script src="roleta-app.js?v=20260903-layout" type="module"></script>
 </body>
 </html>

@@ -104,6 +104,18 @@ export async function buscarConfigAtivoRemoto() {
   return dados.dados || null; // { nome, config, ativadoEm } ou null
 }
 
+/** Lista somente os nomes dos perfis disponibilizados no menu público. */
+export async function listarPerfisPublicosRemoto() {
+  const dados = await chamarBackendGet("perfisPublicos");
+  return { perfis: Array.isArray(dados.perfis) ? dados.perfis : [], ativo: dados.ativo || "" };
+}
+
+/** Busca um perfil escolhido no menu. O servidor continua sendo a fonte da verdade. */
+export async function buscarPerfilPublicoRemoto(nome) {
+  const dados = await chamarBackendGet("perfilPublico", { nome: String(nome || "") });
+  return dados.dados || null;
+}
+
 /** Lista todos os perfis salvos na "biblioteca" central. */
 export async function listarPerfisRemoto() {
   const dados = await chamarBackendPost({ acao: "listarPerfis", adminSecret: segredoAdmin });
@@ -128,12 +140,13 @@ export async function excluirPerfilRemoto(nome) {
 }
 
 /** O backend sorteia e registra atomicamente; o cliente apenas anima o resultado. */
-export async function sortearGiroRemoto(nome, idGiro = gerarIdSeguro()) {
+export async function sortearGiroRemoto(nome, idGiro = gerarIdSeguro(), perfil = Estado.nomePerfilAtivo) {
   const dados = await chamarBackendPost({
     acao: "sortearGiro",
     idGiro,
     clienteId: obterClienteId(),
-    nome: String(nome || "").trim()
+    nome: String(nome || "").trim(),
+    perfil: String(perfil || "").trim()
   });
   return dados.dados;
 }
@@ -388,15 +401,31 @@ export function aplicarVisualNaTela(config) {
   document.documentElement.style.setProperty("--cor-secundaria", c.corSecundaria);
   document.documentElement.style.setProperty("--fonte-display", `'${c.fonte}', sans-serif`);
   const logo = document.getElementById("logoEmpresa");
+  const nomeEmpresaTopo = document.getElementById("nomeEmpresaTopo");
   const fundo = document.getElementById("fundoPersonalizado");
   const titulo = document.getElementById("topoTitulo");
   if (logo) {
     if (c.logoUrl) {
-      logo.onerror = () => { logo.removeAttribute("src"); logo.classList.add("oculto"); };
+      logo.onerror = () => {
+        logo.removeAttribute("src");
+        logo.classList.add("oculto");
+        if (nomeEmpresaTopo) {
+          nomeEmpresaTopo.textContent = c.nome || "Korax";
+          nomeEmpresaTopo.classList.remove("oculto");
+        }
+      };
       logo.src = c.logoUrl;
       logo.classList.remove("oculto");
+      if (nomeEmpresaTopo) nomeEmpresaTopo.classList.add("oculto");
     }
-    else { logo.removeAttribute("src"); logo.classList.add("oculto"); }
+    else {
+      logo.removeAttribute("src");
+      logo.classList.add("oculto");
+      if (nomeEmpresaTopo) {
+        nomeEmpresaTopo.textContent = c.nome || "Korax";
+        nomeEmpresaTopo.classList.remove("oculto");
+      }
+    }
   }
   if (fundo) fundo.style.backgroundImage = c.planoFundoUrl ? `url("${String(c.planoFundoUrl).replace(/["\\\n\r]/g, "")}")` : "none";
   if (titulo) titulo.textContent = c.tituloRoleta || "Roleta da Sorte";
@@ -423,6 +452,7 @@ export const Roleta = {
     if (!ctx) return;
     const premios = (Estado.config && Estado.config.premios) || [];
     const raio = canvas.width / 2;
+    const raioInterno = raio * 0.24;
     const n = premios.length || 1;
     const anguloFatia = (Math.PI * 2) / n;
 
@@ -434,8 +464,8 @@ export const Roleta = {
     let anguloInicial = -Math.PI / 2;
     premios.forEach((premio) => {
       ctx.beginPath();
-      ctx.moveTo(0, 0);
       ctx.arc(0, 0, raio - 6, anguloInicial, anguloInicial + anguloFatia);
+      ctx.arc(0, 0, raioInterno, anguloInicial + anguloFatia, anguloInicial, true);
       ctx.closePath();
       ctx.fillStyle = premio.cor || "#888";
       ctx.fill();

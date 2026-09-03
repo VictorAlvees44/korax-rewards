@@ -24,6 +24,7 @@ Painel /admin ── segredo em sessionStorage ──> validação com ADMIN_SEC
 ## Garantias importantes
 
 - O navegador não escolhe nem informa o prêmio: o Apps Script sorteia, grava e devolve o resultado.
+- O menu público lista os perfis salvos. Ao trocar de perfil, o servidor carrega sua configuração e limita o sorteio oficial aos itens desse perfil; o navegador nunca escolhe o resultado.
 - Cada giro possui ID aleatório e uma aba de controle oculta impede registros duplicados.
 - Se o backend falhar, nenhum resultado não oficial é exibido. A aplicação requer internet para girar.
 - Data e hora registradas vêm do servidor, no fuso `America/Sao_Paulo`.
@@ -78,7 +79,9 @@ Os sons padrão versionados em `assets/audio/` são: `roleta-girando.mp3` durant
 2. Clique em **Adicionar prêmio** para criar um resultado com uma cor aleatória ainda não usada. Cada perfil aceita de 2 a 50 resultados.
 3. Para trocar uma cor, clique em **↻**. A nova cor também exclui todas as cores atuais, inclusive a que está sendo substituída. Não há seletor manual de cores dos prêmios.
 4. **Testar giro** apenas anima a prévia, sem criar registros na planilha. A edição fica bloqueada durante a animação para não mudar os prêmios no meio do teste.
-5. Clique em **Publicar este layout** para aplicar as alterações. Salvar na biblioteca, sozinho, não muda o perfil publicado.
+5. Clique em **Publicar este layout** para torná-lo a opção inicial. Salvar na biblioteca adiciona ou atualiza o perfil no menu, mas não troca a opção inicial.
+
+Na página pública, os perfis salvos aparecem no menu lateral. O visitante pode escolher a roleta antes de girar; cada resultado é registrado na aba mensal do perfil selecionado.
 
 Durante o salvamento e a publicação, o painel bloqueia novas edições até a resposta do servidor, mantendo a biblioteca e a roleta na mesma versão dos prêmios.
 
