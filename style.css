@@ -172,7 +172,22 @@ input, select { font-family: inherit; }
   border: 3px solid rgba(255,255,255,0.35);
   z-index: 4;
   overflow: hidden;
+  padding: 0;
+  appearance: none;
+  transition: transform var(--transicao), box-shadow var(--transicao), opacity var(--transicao);
 }
+
+.cubo-central:hover:not(:disabled) {
+  transform: scale(1.06);
+  box-shadow: 0 0 42px rgba(201,162,39,0.75), inset 0 2px 6px rgba(255,255,255,0.5);
+}
+
+.cubo-central:active:not(:disabled) { transform: scale(0.97); }
+.cubo-central:focus-visible {
+  outline: 4px solid #ffffff;
+  outline-offset: 5px;
+}
+.cubo-central:disabled { opacity: 0.62; cursor: wait; }
 
 .cubo-central__logo {
   width: 78%;

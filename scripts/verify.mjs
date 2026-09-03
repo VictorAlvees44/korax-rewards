@@ -29,6 +29,12 @@ for (const html of ["index.html", "admin/index.html", "privacidade.html"]) {
   }
 }
 
+const paginaPublica = readFileSync(resolve(raiz, "index.html"), "utf8");
+const botoesGirar = [...paginaPublica.matchAll(/id="btnGirar"/g)];
+if (botoesGirar.length !== 1 || !/<button[^>]+id="btnGirar"[^>]*>[\s\S]*?GIRAR[\s\S]*?<\/button>/.test(paginaPublica)) {
+  throw new Error("A página pública deve possuir um único botão central de giro.");
+}
+
 const codigoCliente = arquivosJs.map((arquivo) => readFileSync(resolve(raiz, arquivo), "utf8")).join("\n");
 if (/\.innerHTML\s*=|insertAdjacentHTML|document\.write\s*\(|\beval\s*\(/.test(codigoCliente)) {
   throw new Error("Foi encontrado um sink de HTML dinâmico inseguro.");

@@ -309,19 +309,11 @@ export function atualizarLogoCentral(logoUrl) {
   const img = document.getElementById("logoCentral");
   const texto = document.getElementById("textoCentral");
   if (!img || !texto) return;
-  if (logoUrl) {
-    img.onerror = () => {
-      img.removeAttribute("src");
-      img.classList.add("oculto");
-      texto.classList.remove("oculto");
-    };
-    img.src = logoUrl;
-    img.classList.remove("oculto");
-    texto.classList.add("oculto");
-  } else {
-    img.classList.add("oculto");
-    texto.classList.remove("oculto");
-  }
+  // O centro da roleta é o único controle de giro e precisa manter seu
+  // propósito visível mesmo quando o perfil possui um logotipo.
+  img.removeAttribute("src");
+  img.classList.add("oculto");
+  texto.classList.remove("oculto");
 }
 
 export function carregarSonsNosElementos(config) {
