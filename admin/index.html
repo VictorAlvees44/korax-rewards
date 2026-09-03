@@ -61,13 +61,19 @@
     <div class="previa-admin__acoes">
       <button id="btnTestarGiro" class="botao-secundario">🎲 Testar giro (não registra)</button>
       <button id="btnAtivarPerfil" class="botao-principal">🚀 Publicar este layout na roleta pública</button>
+      <p id="statusEdicaoPremios" class="status-edicao" role="status" aria-live="polite"></p>
     </div>
   </div>
 
   <!-- ABA PREMIOS -->
   <div class="painel__conteudo" data-conteudo="premios">
+    <div class="painel__dica">
+      Edite o nome, a categoria, o tipo e a mensagem de cada resultado. Todos têm a mesma chance em cada giro, inclusive os resultados negativos. Um prêmio pode sair novamente em outro giro.
+      As cores são geradas automaticamente sem repetição neste perfil. Clique em ↻ para sortear outra cor.
+    </div>
+    <p id="resumoPremios" class="resumo-premios" aria-live="polite"></p>
     <div class="painel__acoes-topo">
-      <button id="btnAdicionarPremio" class="botao-secundario">+ Adicionar prêmio (cor sorteada automaticamente)</button>
+      <button id="btnAdicionarPremio" class="botao-secundario">+ Adicionar prêmio (cor aleatória exclusiva)</button>
     </div>
     <div id="listaPremios" class="lista-premios"></div>
   </div>

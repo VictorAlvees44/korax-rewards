@@ -112,11 +112,13 @@ export async function listarPerfisRemoto() {
 
 /** Salva (cria ou sobrescreve) um perfil na biblioteca central, sem publicá-lo. */
 export async function salvarPerfilRemoto(nome, config) {
+  validarConfiguracao(config);
   return chamarBackendPost({ acao: "salvarPerfil", nome, config, adminSecret: segredoAdmin });
 }
 
 /** Publica um perfil como o que a roleta pública deve exibir agora. */
 export async function ativarPerfilRemoto(nome, config) {
+  validarConfiguracao(config);
   return chamarBackendPost({ acao: "ativarPerfil", nome, config, adminSecret: segredoAdmin });
 }
 
@@ -183,7 +185,7 @@ export async function obterConfigParaExibir() {
   try {
     const remoto = await buscarConfigAtivoRemoto();
     if (remoto && remoto.config) {
-      validarConfiguracao(remoto.config);
+      validarConfiguracao(remoto.config, { permitirCoresRepetidas: true });
       cachearConfigAtivo(remoto.nome, remoto.config);
       return { nome: remoto.nome, config: remoto.config, origem: "remoto" };
     }
@@ -193,7 +195,7 @@ export async function obterConfigParaExibir() {
   const cache = lerCacheConfigAtivo();
   if (cache) {
     try {
-      validarConfiguracao(cache.config);
+      validarConfiguracao(cache.config, { permitirCoresRepetidas: true });
       return { nome: cache.nome, config: cache.config, origem: "cache" };
     } catch (erro) {
       localStorage.removeItem(CHAVE_CACHE_CONFIG_ATIVO);
@@ -225,13 +227,60 @@ export function gerarId() {
   return "p" + gerarIdSeguro().slice(0, 12);
 }
 
-/** Gera uma cor hexadecimal aleatória, mas vibrante e legível
- *  (evita tons muito escuros ou muito claros que ficam ilegíveis no texto). */
-export function gerarCorAleatoria() {
-  const h = Math.floor(Math.random() * 360);
-  const s = 62 + Math.floor(Math.random() * 22); // 62–84%
-  const l = 42 + Math.floor(Math.random() * 14); // 42–56%
-  return hslParaHex(h, s, l);
+/** Sorteio uniforme: rejeita a sobra da divisão para não favorecer índices. */
+export function sortearIndiceUniforme(tamanho, proximoUint32 = gerarUint32) {
+  if (!Number.isInteger(tamanho) || tamanho < 1 || tamanho > 0x100000000) {
+    throw new Error("Tamanho inválido para o sorteio.");
+  }
+  const limite = Math.floor(0x100000000 / tamanho) * tamanho;
+  let valor;
+  do {
+    valor = proximoUint32();
+    if (!Number.isInteger(valor) || valor < 0 || valor > 0xffffffff) {
+      throw new Error("A fonte aleatória retornou um valor inválido.");
+    }
+  } while (valor >= limite);
+  return valor % tamanho;
+}
+
+function gerarUint32() {
+  if (!globalThis.crypto || typeof globalThis.crypto.getRandomValues !== "function") {
+    throw new Error("Este navegador não oferece aleatoriedade segura.");
+  }
+  return globalThis.crypto.getRandomValues(new Uint32Array(1))[0];
+}
+
+/** Gera uma cor vibrante, excluindo todas as cores já usadas no perfil. */
+export function gerarCorAleatoria(coresEmUso = [], sortearIndice = sortearIndiceUniforme) {
+  const usadas = new Set(coresEmUso.map((cor) => String(cor).trim().toUpperCase()));
+  for (let tentativa = 0; tentativa < 64; tentativa++) {
+    const cor = hslParaHex(sortearIndice(360), 62 + sortearIndice(22), 42 + sortearIndice(14)).toUpperCase();
+    if (!usadas.has(cor)) return cor;
+  }
+  // Mesmo se a fonte repetir candidatos, não há loop infinito nem cor duplicada.
+  // A paleta reserva tem 360 cores; um perfil aceita no máximo 50 prêmios.
+  const disponiveis = Array.from({ length: 360 }, (_, h) => hslParaHex(h, 72, 56).toUpperCase())
+    .filter((cor) => !usadas.has(cor));
+  if (!disponiveis.length) throw new Error("Não há cores disponíveis para este perfil.");
+  return disponiveis[sortearIndice(disponiveis.length)];
+}
+
+/** Corrige perfis antigos/importados sem mudar nomes, IDs ou probabilidades. */
+export function corrigirCoresRepetidas(premios) {
+  const ocupadas = new Set(premios.map((premio) => String(premio.cor).trim().toUpperCase()));
+  const vistas = new Set();
+  let alteradas = 0;
+  for (const premio of premios) {
+    let cor = String(premio.cor).trim().toUpperCase();
+    if (vistas.has(cor)) {
+      cor = gerarCorAleatoria([...ocupadas]);
+      ocupadas.add(cor);
+      alteradas++;
+    }
+    premio.cor = cor;
+    vistas.add(cor);
+  }
+  return alteradas;
 }
 
 function hslParaHex(h, s, l) {
@@ -252,7 +301,7 @@ export function formatarDataHora(data) {
 }
 
 /** Validação defensiva usada antes de aceitar JSON importado no admin. */
-export function validarConfiguracao(config) {
+export function validarConfiguracao(config, { permitirCoresRepetidas = false } = {}) {
   if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("estrutura raiz inválida");
   const serializada = JSON.stringify(config);
   if (serializada.length > 8 * 1024 * 1024) throw new Error("o perfil excede 8 MB");
@@ -261,6 +310,7 @@ export function validarConfiguracao(config) {
     throw new Error("use entre 2 e 50 prêmios");
   }
   const ids = new Set();
+  const cores = new Set();
   config.premios.forEach((premio, indice) => {
     if (!premio || typeof premio !== "object") throw new Error(`prêmio ${indice + 1} inválido`);
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(premio.id || "")) || ids.has(premio.id)) {
@@ -269,6 +319,9 @@ export function validarConfiguracao(config) {
     ids.add(premio.id);
     if (!String(premio.nome || "").trim() || String(premio.nome).length > 80) throw new Error(`nome do prêmio ${indice + 1} inválido`);
     if (!/^#[0-9A-Fa-f]{6}$/.test(String(premio.cor || ""))) throw new Error(`cor do prêmio ${indice + 1} inválida`);
+    const cor = premio.cor.toUpperCase();
+    if (!permitirCoresRepetidas && cores.has(cor)) throw new Error("as cores dos prêmios não podem se repetir");
+    cores.add(cor);
   });
   const duracao = Number(config.roleta.duracaoGiroMs);
   const voltas = Number(config.roleta.voltasMinimas);
@@ -418,13 +471,7 @@ export const Roleta = {
 
 export function sortearPremioAleatorio(premios) {
   if (!Array.isArray(premios) || premios.length === 0) throw new Error("Não há prêmios para sortear.");
-  if (!globalThis.crypto || typeof globalThis.crypto.getRandomValues !== "function") {
-    throw new Error("Este navegador não oferece aleatoriedade segura.");
-  }
-  const limite = Math.floor(0x100000000 / premios.length) * premios.length;
-  const valor = new Uint32Array(1);
-  do { globalThis.crypto.getRandomValues(valor); } while (valor[0] >= limite);
-  return premios[valor[0] % premios.length];
+  return premios[sortearIndiceUniforme(premios.length)];
 }
 
 export function calcularAnguloFinal(premios, premioEscolhido) {

@@ -70,6 +70,22 @@ Em seguida abra `SUA_URL/exec?acao=configAtivo`. Antes do primeiro perfil public
 
 Uploads individuais de imagem ou áudio são limitados a 2 MB. O perfil completo não pode ultrapassar 8 MB. SVG não é aceito, reduzindo risco de conteúdo ativo.
 
+## Uso pelo comercial: prêmios, cores e chances
+
+1. Entre no admin e abra **Prêmios**. Edite nome, categoria, tipo (positivo/negativo) e mensagem do resultado.
+2. Clique em **Adicionar prêmio** para criar um resultado com uma cor aleatória ainda não usada. Cada perfil aceita de 2 a 50 resultados.
+3. Para trocar uma cor, clique em **↻**. A nova cor também exclui todas as cores atuais, inclusive a que está sendo substituída. Não há seletor manual de cores dos prêmios.
+4. **Testar giro** apenas anima a prévia, sem criar registros na planilha. A edição fica bloqueada durante a animação para não mudar os prêmios no meio do teste.
+5. Clique em **Publicar este layout** para aplicar as alterações. Salvar na biblioteca, sozinho, não muda o perfil publicado.
+
+Durante o salvamento e a publicação, o painel bloqueia novas edições até a resposta do servidor, mantendo a biblioteca e a roleta na mesma versão dos prêmios.
+
+Cada item tem probabilidade `1 / quantidade de itens` em cada giro. Não há pesos, sequência predeterminada ou influência de nome, categoria, cor, tipo ou histórico. Resultados podem se repetir entre giros; somente as cores do mesmo perfil não podem se repetir. Probabilidades iguais não significam quantidades idênticas de resultados em poucas tentativas.
+
+O sorteio oficial acontece no servidor usando o gerador pseudoaleatório de UUID do Google, com rejeição da sobra antes de calcular o índice (evita viés de módulo). A documentação de [`Utilities.getUuid`](https://developers.google.com/apps-script/reference/utilities/utilities#getUuid()) informa equivalência com `java.util.UUID.randomUUID()`. A prévia e as cores usam `crypto.getRandomValues` no navegador. Isso não é uma certificação externa de sorteios.
+
+Perfis antigos ou importados com cores iguais são corrigidos ao abrir no admin: os prêmios são preservados e apenas as cores repetidas são sorteadas novamente. Publique o perfil para persistir a correção. O backend atualizado recusa salvar/publicar configurações com cores duplicadas; leituras legadas continuam permitidas para não perder perfis antigos.
+
 ## Planilhas e idempotência
 
 Os giros são gravados em abas no formato `Perfil - MM-AAAA`. A primeira coluna contém o `ID do Giro`. A aba oculta `_Controle_Giros` é o índice de idempotência: repetir a mesma requisição devolve o resultado original sem criar outra linha ou enviar outro e-mail.
@@ -97,6 +113,8 @@ npm test
 ```
 
 O workflow `.github/workflows/quality.yml` executa validação de sintaxe, JSON, referências locais, CSP, ausência dos fluxos inseguros antigos e testes unitários em cada push ou pull request.
+
+Para testar a interface sem Google, execute `node scripts/serve-ui-fixture.mjs` e abra `http://127.0.0.1:43119/admin/` usando a credencial fictícia `local-test-only`. Esse servidor aceita conexões somente da máquina local, usa perfis descartáveis em memória, exercita a correção de cores legadas e valida salvamento/publicação com o código real do Apps Script. O redirecionamento das chamadas acontece apenas nas respostas HTTP locais: nenhum arquivo de produção é alterado. Ele não realiza giros oficiais, não envia e-mails e não grava na planilha. Encerre com `Ctrl+C`.
 
 ## Limitações conhecidas
 

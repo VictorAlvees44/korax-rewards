@@ -130,7 +130,7 @@ function listarPerfis() {
     if (arquivo.getName().indexOf("perfil__") !== 0) continue;
     try {
       var dados = JSON.parse(arquivo.getBlob().getDataAsString());
-      mapa[validarNomePerfil(dados.nome)] = validarENormalizarConfig(dados.config);
+      mapa[validarNomePerfil(dados.nome)] = validarENormalizarConfig(dados.config, true);
     } catch (ignorado) {}
   }
   return mapa;
@@ -173,7 +173,7 @@ function obterConfigAtivo() {
   var existentes = pasta.getFilesByName(ARQUIVO_ATIVO_NOME);
   if (!existentes.hasNext()) return null;
   var dados = JSON.parse(existentes.next().getBlob().getDataAsString());
-  return { nome: validarNomePerfil(dados.nome), config: validarENormalizarConfig(dados.config), ativadoEm: dados.ativadoEm || "" };
+  return { nome: validarNomePerfil(dados.nome), config: validarENormalizarConfig(dados.config, true), ativadoEm: dados.ativadoEm || "" };
 }
 
 // ======================= SORTEIO E REGISTRO =======================
@@ -232,12 +232,18 @@ function aplicarLimiteDeGiros(clienteId) {
 }
 
 function indiceAleatorioSeguro(tamanho) {
-  if (!tamanho || tamanho < 1) throw new Error("Lista de prêmios vazia.");
+  if (!Number.isInteger(tamanho) || tamanho < 1 || tamanho > 50) throw new Error("Quantidade de prêmios inválida.");
   var universo = 4294967296;
   var limite = Math.floor(universo / tamanho) * tamanho;
   var valor;
   do {
-    valor = parseInt(Utilities.getUuid().replace(/-/g, "").substring(0, 8), 16);
+    // getUuid usa UUID.randomUUID. Os primeiros 32 bits não contêm os bits
+    // fixos de versão/variante. Rejeitar a sobra evita o viés de módulo.
+    var uuid = String(Utilities.getUuid());
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid)) {
+      throw new Error("A fonte aleatória retornou um identificador inválido.");
+    }
+    valor = parseInt(uuid.substring(0, 8), 16);
   } while (valor >= limite);
   return valor % tamanho;
 }
@@ -336,7 +342,7 @@ function enviarEmailNotificacao(dados) {
 
 // ======================= VALIDACAO =======================
 
-function validarENormalizarConfig(config) {
+function validarENormalizarConfig(config, permitirCoresLegadas) {
   if (!config || Object.prototype.toString.call(config) !== "[object Object]") throw new Error("Configuração inválida.");
   if (JSON.stringify(config).length > TAMANHO_MAX_REQUISICAO) throw new Error("Perfil excede o limite de 8 MB.");
   var empresa = config.empresa || {};
@@ -346,15 +352,19 @@ function validarENormalizarConfig(config) {
   if (!Array.isArray(premios) || premios.length < 2 || premios.length > 50) throw new Error("O perfil deve conter entre 2 e 50 prêmios.");
 
   var ids = {};
+  var cores = {};
   var premiosNormalizados = premios.map(function (premio, indice) {
     if (!premio || typeof premio !== "object") throw new Error("Prêmio inválido na posição " + (indice + 1) + ".");
     var id = normalizarTexto(premio.id, "id do prêmio", 64, true);
     if (!/^[A-Za-z0-9_-]+$/.test(id) || ids[id]) throw new Error("IDs de prêmio devem ser únicos e alfanuméricos.");
     ids[id] = true;
+    var cor = validarCor(premio.cor);
+    if (!permitirCoresLegadas && cores[cor]) throw new Error("As cores dos prêmios não podem se repetir. Sorteie outra cor no painel.");
+    cores[cor] = true;
     return {
       id: id,
       nome: normalizarTexto(premio.nome, "nome do prêmio", 80, true),
-      cor: validarCor(premio.cor),
+      cor: cor,
       categoria: normalizarTexto(premio.categoria || "", "categoria", 60, false),
       descricao: normalizarTexto(premio.descricao || "", "descrição", 240, false),
       positivo: premio.positivo === true,

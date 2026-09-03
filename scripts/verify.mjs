@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 
 const raiz = resolve(import.meta.dirname, "..");
-const arquivosJs = ["config.js", "core.js", "roleta-app.js", "admin/admin-app.js"];
+const arquivosJs = ["config.js", "core.js", "roleta-app.js", "admin/admin-app.js", "scripts/serve-ui-fixture.mjs"];
 
 for (const arquivo of arquivosJs) {
   const resultado = spawnSync(process.execPath, ["--check", resolve(raiz, arquivo)], { encoding: "utf8" });

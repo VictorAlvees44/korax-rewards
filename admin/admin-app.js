@@ -11,12 +11,13 @@ import {
   buscarConfigAtivoRemoto, listarPerfisRemoto, salvarPerfilRemoto,
   ativarPerfilRemoto, excluirPerfilRemoto,
   autenticarAdminRemoto, configurarCredencialAdmin, validarConfiguracao,
-  gerarId, gerarCorAleatoria, mostrarToast, carregarHistorico,
+  gerarId, gerarCorAleatoria, corrigirCoresRepetidas, mostrarToast, carregarHistorico,
   aplicarVisualNaTela, carregarSonsNosElementos, sortearPremioAleatorio,
   girarRoleta, obterUrlBackend
 } from "../core.js";
 
 let Perfis = {}; // cache local em memória do que veio do backend: { nome: config }
+let painelOcupado = false;
 const CHAVE_SESSAO_ADMIN = "roletaCorp_admin_secret_v1";
 const TAMANHO_MAX_UPLOAD = 2 * 1024 * 1024;
 
@@ -54,19 +55,47 @@ function configurarAbas() {
 
 function configurarPremios() {
   document.getElementById("btnAdicionarPremio").addEventListener("click", () => {
+    if (Estado.girando) return;
+    if (Estado.config.premios.length >= 50) { mostrarToast("Cada perfil aceita no máximo 50 prêmios."); return; }
     Estado.config.premios.push({
-      id: gerarId(), nome: "Novo prêmio", cor: gerarCorAleatoria(),
+      id: gerarId(), nome: "Novo prêmio", cor: gerarCorAleatoria(Estado.config.premios.map((p) => p.cor)),
       categoria: "Brinde", descricao: "", positivo: true, som: ""
     });
+    marcarEdicaoPremios();
     renderizarListaPremios();
     Roleta.desenhar(Estado.anguloAtual);
   });
 }
 
+function marcarEdicaoPremios() {
+  Estado._ehPerfilPublicadoAgora = false;
+  atualizarRotuloPerfilAtual();
+  document.getElementById("statusEdicaoPremios").textContent = "Alterações ainda não publicadas. Clique em Publicar este layout para aplicá-las na roleta.";
+}
+
+function atualizarResumoPremios() {
+  const quantidade = Estado.config.premios.length;
+  const chance = (100 / quantidade).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  document.getElementById("resumoPremios").textContent = `${quantidade} prêmios • Chance de cada um: 1 em ${quantidade} (aprox. ${chance}%) • Cores exclusivas`;
+  document.getElementById("btnAdicionarPremio").disabled = painelOcupado || Estado.girando || quantidade >= 50;
+}
+
+function bloquearEdicaoPainel() {
+  painelOcupado = true;
+  const controles = Array.from(document.querySelectorAll("#painelAdmin input, #painelAdmin select, #painelAdmin button"));
+  const estadosAnteriores = controles.map((controle) => controle.disabled);
+  controles.forEach((controle) => { controle.disabled = true; });
+  return () => {
+    controles.forEach((controle, indice) => { controle.disabled = estadosAnteriores[indice]; });
+    painelOcupado = false;
+    atualizarResumoPremios();
+  };
+}
+
 function renderizarListaPremios() {
   const lista = document.getElementById("listaPremios");
   lista.replaceChildren();
-  Estado.config.premios.forEach((premio) => {
+  Estado.config.premios.forEach((premio, indice) => {
     const cartao = document.createElement("div");
     cartao.className = "cartao-premio";
 
@@ -76,17 +105,33 @@ function renderizarListaPremios() {
       input.value = valor;
       input.dataset.campo = campo;
       input.placeholder = placeholder;
+      input.setAttribute("aria-label", `${placeholder} — prêmio ${indice + 1}`);
       return input;
     };
-    const cor = criarInput("color", premio.cor, "cor");
+    const cor = document.createElement("button");
+    cor.type = "button";
     cor.className = "cartao-premio__cor";
-    cor.title = "Cor do prêmio";
+    cor.textContent = "↻";
+    const atualizarCor = () => {
+      cor.style.backgroundColor = premio.cor;
+      cor.title = `Cor ${premio.cor}. Clique para sortear outra cor exclusiva.`;
+      cor.setAttribute("aria-label", `Sortear outra cor — prêmio ${indice + 1}`);
+    };
+    atualizarCor();
+    cor.addEventListener("click", () => {
+      if (Estado.girando) return;
+      premio.cor = gerarCorAleatoria(Estado.config.premios.map((p) => p.cor));
+      atualizarCor();
+      marcarEdicaoPremios();
+      Roleta.desenhar(Estado.anguloAtual);
+    });
     const nome = criarInput("text", premio.nome, "nome", "Nome do prêmio");
     nome.maxLength = 80;
     const categoria = criarInput("text", premio.categoria, "categoria", "Categoria");
     categoria.maxLength = 60;
     const positivo = document.createElement("select");
     positivo.dataset.campo = "positivo";
+    positivo.setAttribute("aria-label", `Tipo do resultado — prêmio ${indice + 1}`);
     [["true", "Positivo"], ["false", "Negativo"]].forEach(([valor, texto]) => {
       const opcao = document.createElement("option");
       opcao.value = valor;
@@ -96,9 +141,13 @@ function renderizarListaPremios() {
     });
     const remover = document.createElement("button");
     remover.className = "botao-remover";
-    remover.title = "Remover prêmio";
+    remover.title = `Remover prêmio ${indice + 1}`;
+    remover.setAttribute("aria-label", remover.title);
     remover.textContent = "Remover";
-    cartao.append(cor, nome, categoria, positivo, remover);
+    const descricao = criarInput("text", premio.descricao || "", "descricao", "Mensagem do resultado");
+    descricao.maxLength = 240;
+    descricao.className = "cartao-premio__descricao";
+    cartao.append(cor, nome, categoria, positivo, remover, descricao);
 
     cartao.querySelectorAll("[data-campo]").forEach((campo) => {
       campo.addEventListener("input", () => {
@@ -106,19 +155,23 @@ function renderizarListaPremios() {
         let valor = campo.value;
         if (chave === "positivo") valor = valor === "true";
         premio[chave] = valor;
+        marcarEdicaoPremios();
         Roleta.desenhar(Estado.anguloAtual);
       });
     });
 
     remover.addEventListener("click", () => {
+      if (Estado.girando) return;
       if (Estado.config.premios.length <= 2) { mostrarToast("A roleta precisa de pelo menos 2 prêmios."); return; }
       Estado.config.premios = Estado.config.premios.filter((p) => p.id !== premio.id);
+      marcarEdicaoPremios();
       renderizarListaPremios();
       Roleta.desenhar(Estado.anguloAtual);
     });
 
     lista.appendChild(cartao);
   });
+  atualizarResumoPremios();
 }
 
 /* ========================================================================
@@ -213,6 +266,7 @@ function atualizarRotuloPerfilAtual() {
 
 function configurarPerfis() {
   document.getElementById("btnSalvarNovoPerfil").addEventListener("click", async () => {
+    if (painelOcupado) return;
     const campoNome = document.getElementById("inputNomeNovoPerfil");
     const nome = campoNome.value.trim() || Estado.nomePerfilAtivo;
     if (!nome) { mostrarToast("Digite um nome para o perfil."); return; }
@@ -220,49 +274,72 @@ function configurarPerfis() {
 
     if (Perfis[nome] && nome !== Estado.nomePerfilAtivo && !confirm(`Já existe um perfil chamado "${nome}". Substituir?`)) return;
 
+    const configSalva = structuredClone(Estado.config);
+    const liberar = bloquearEdicaoPainel();
     try {
-      await salvarPerfilRemoto(nome, Estado.config);
-      Perfis[nome] = structuredClone(Estado.config);
+      await salvarPerfilRemoto(nome, configSalva);
+      Perfis[nome] = configSalva;
       Estado.nomePerfilAtivo = nome;
       Estado._ehPerfilPublicadoAgora = false;
       campoNome.value = "";
       atualizarRotuloPerfilAtual();
       renderizarListaPerfis();
+      document.getElementById("statusEdicaoPremios").textContent = "Perfil salvo na biblioteca. Publique o layout para atualizar a roleta pública.";
       mostrarToast(`Perfil "${nome}" salvo na biblioteca.`);
     } catch (erro) {
       mostrarToast("Não foi possível salvar: " + erro.message);
+    } finally {
+      liberar();
     }
   });
 
   document.getElementById("btnAtivarPerfil").addEventListener("click", async () => {
+    if (painelOcupado) return;
     if (!obterUrlBackend()) { mostrarToast("Configure a URL do backend na aba Configurações antes de publicar."); return; }
     let nome = Estado.nomePerfilAtivo;
     if (!nome) {
       nome = (document.getElementById("inputNomeNovoPerfil").value || "").trim();
       if (!nome) { mostrarToast("Dê um nome ao perfil (aba Perfis) antes de publicar."); return; }
     }
+    const configPublicada = structuredClone(Estado.config);
+    const liberar = bloquearEdicaoPainel();
     try {
-      await salvarPerfilRemoto(nome, Estado.config); // mantém a biblioteca sincronizada
-      await ativarPerfilRemoto(nome, Estado.config);
-      Perfis[nome] = structuredClone(Estado.config);
+      await salvarPerfilRemoto(nome, configPublicada); // mantém a biblioteca sincronizada
+      await ativarPerfilRemoto(nome, configPublicada);
+      Perfis[nome] = configPublicada;
       Estado.nomePerfilAtivo = nome;
       Estado._ehPerfilPublicadoAgora = true;
       atualizarRotuloPerfilAtual();
       renderizarListaPerfis();
+      document.getElementById("statusEdicaoPremios").textContent = "Perfil publicado. Os próximos giros usarão estes prêmios.";
       mostrarToast(`"${nome}" agora está ativo na roleta pública!`);
     } catch (erro) {
       mostrarToast("Não foi possível publicar: " + erro.message);
+    } finally {
+      liberar();
     }
   });
 
   document.getElementById("btnTestarGiro").addEventListener("click", () => {
-    if (Estado.girando || Estado.config.premios.length < 2) return;
+    if (painelOcupado || Estado.girando || Estado.config.premios.length < 2) return;
+    try { validarConfiguracao(Estado.config); }
+    catch (erro) { mostrarToast("Revise os prêmios: " + erro.message); return; }
     Estado.girando = true;
-    const premioEscolhido = sortearPremioAleatorio(Estado.config.premios);
-    girarRoleta(premioEscolhido, 2600, () => {
+    const liberarEdicao = bloquearEdicaoPainel();
+    const liberar = () => {
       Estado.girando = false;
-      mostrarToast(`Teste: saiu "${premioEscolhido.nome}" (nada foi registrado).`);
-    });
+      liberarEdicao();
+    };
+    try {
+      const premioEscolhido = sortearPremioAleatorio(Estado.config.premios);
+      girarRoleta(premioEscolhido, 2600, () => {
+        liberar();
+        mostrarToast(`Teste: saiu "${premioEscolhido.nome}" (nada foi registrado).`);
+      });
+    } catch (erro) {
+      liberar();
+      mostrarToast("Não foi possível testar: " + erro.message);
+    }
   });
 }
 
@@ -370,7 +447,7 @@ function configurarConfiguracoesGerais() {
     leitor.onload = () => {
       try {
         const importada = JSON.parse(leitor.result);
-        validarConfiguracao(importada);
+        validarConfiguracao(importada, { permitirCoresRepetidas: true });
         Estado.config = importada;
         Estado.nomePerfilAtivo = "";
         Estado._ehPerfilPublicadoAgora = false;
@@ -461,6 +538,14 @@ const HistoricoEstatisticas = {
 
 function preencherCampos() {
   const c = Estado.config;
+  validarConfiguracao(c, { permitirCoresRepetidas: true });
+  const coresCorrigidas = corrigirCoresRepetidas(c.premios);
+  if (coresCorrigidas) {
+    marcarEdicaoPremios();
+    document.getElementById("statusEdicaoPremios").textContent = `${coresCorrigidas} cor(es) repetida(s) receberam novas cores aleatórias. Publique para aplicar na roleta.`;
+  } else {
+    document.getElementById("statusEdicaoPremios").textContent = "Edite os prêmios e publique o layout para aplicar as alterações na roleta pública.";
+  }
   document.getElementById("inputNomeEmpresa").value = c.empresa.nome;
   document.getElementById("inputTituloRoleta").value = c.empresa.tituloRoleta || "Roleta da Sorte";
   document.getElementById("inputCorPrimaria").value = c.empresa.corPrimaria;
