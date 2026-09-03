@@ -10,7 +10,7 @@ import {
   obterConfigParaExibir, sortearGiroRemoto, gerarIdSeguro, girarRoleta,
   adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela
-} from "./core.js";
+} from "./core.js?v=20260903-sons";
 
 const ModalNome = {
   el: null, input: null, erro: null,

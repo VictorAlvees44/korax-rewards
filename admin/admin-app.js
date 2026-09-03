@@ -14,7 +14,7 @@ import {
   gerarId, gerarCorAleatoria, corrigirCoresRepetidas, mostrarToast, carregarHistorico,
   aplicarVisualNaTela, carregarSonsNosElementos, sortearPremioAleatorio,
   girarRoleta, obterUrlBackend
-} from "../core.js";
+} from "../core.js?v=20260903-sons";
 
 let Perfis = {}; // cache local em memória do que veio do backend: { nome: config }
 let painelOcupado = false;
