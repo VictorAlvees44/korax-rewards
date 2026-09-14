@@ -40,6 +40,12 @@ html, body {
 
 button { font-family: inherit; cursor: pointer; }
 input, select { font-family: inherit; }
+select { color-scheme: dark; }
+select option {
+  background-color: #131b30;
+  color: #F5F3EE;
+}
+select option:disabled { color: #8f98aa; }
 
 /* ============================= PALCO PRINCIPAL ========================= */
 
