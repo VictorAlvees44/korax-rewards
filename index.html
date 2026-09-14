@@ -8,8 +8,11 @@
 <title>Roleta da Sorte Corporativa</title>
 <meta name="description" content="Roleta da sorte corporativa para campanhas comerciais e eventos">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="dns-prefetch" href="https://script.googleusercontent.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Poppins:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260903-layout">
+<link rel="stylesheet" href="style.css?v=20260914-performance">
 </head>
 <body>
 
@@ -86,13 +89,13 @@
 
 <div id="avisoToast" class="toast oculto"></div>
 
-<audio id="audioGiro" loop></audio>
-<audio id="audioVitoria"></audio>
-<audio id="audioDerrota"></audio>
-<audio id="audioClique"></audio>
-<audio id="audioParada"></audio>
+<audio id="audioGiro" preload="auto" loop></audio>
+<audio id="audioVitoria" preload="auto"></audio>
+<audio id="audioDerrota" preload="auto"></audio>
+<audio id="audioClique" preload="metadata"></audio>
+<audio id="audioParada" preload="metadata"></audio>
 
 <script src="config.js?v=20260903-sons"></script>
-<script src="roleta-app.js?v=20260903-layout" type="module"></script>
+<script src="roleta-app.js?v=20260914-performance" type="module"></script>
 </body>
 </html>

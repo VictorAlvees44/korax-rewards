@@ -390,8 +390,16 @@ export function carregarSonsNosElementos(config) {
     if (!el) return;
     // Caminhos relativos partem da raiz do projeto (onde core.js fica),
     // inclusive quando este módulo é usado pela página /admin/.
-    if (s[chave]) el.src = new URL(s[chave], import.meta.url).href;
-    else el.removeAttribute("src");
+    if (s[chave]) {
+      const proximaUrl = new URL(s[chave], import.meta.url).href;
+      if (el.src !== proximaUrl) {
+        el.src = proximaUrl;
+        el.load();
+      }
+    } else {
+      el.removeAttribute("src");
+      el.load();
+    }
   });
 }
 
@@ -439,12 +447,18 @@ export function aplicarVisualNaTela(config) {
 export const Roleta = {
   canvas: null,
   ctx: null,
+  animacao: null,
 
   iniciar(idCanvas = "canvasRoleta") {
     this.canvas = document.getElementById(idCanvas);
     if (!this.canvas) return;
-    this.ctx = this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext("2d", { alpha: true, desynchronized: true });
     this.desenhar();
+  },
+
+  aplicarRotacao(angulo = 0) {
+    if (!this.canvas) return;
+    this.canvas.style.transform = `rotate(${angulo}rad)`;
   },
 
   desenhar(anguloExtra = 0) {
@@ -459,7 +473,6 @@ export const Roleta = {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(raio, raio);
-    ctx.rotate(anguloExtra);
 
     let anguloInicial = -Math.PI / 2;
     premios.forEach((premio) => {
@@ -494,6 +507,7 @@ export const Roleta = {
     ctx.stroke();
 
     ctx.restore();
+    this.aplicarRotacao(anguloExtra);
   }
 };
 
@@ -520,10 +534,6 @@ export function calcularAnguloFinal(premios, premioEscolhido) {
   return anguloDaFatia + variacao;
 }
 
-function easeOutQuint(t) {
-  return 1 - Math.pow(1 - t, 5);
-}
-
 function normalizarAngulo(angulo) {
   const voltaCompleta = Math.PI * 2;
   return ((angulo % voltaCompleta) + voltaCompleta) % voltaCompleta;
@@ -539,21 +549,53 @@ export function girarRoleta(premioEscolhido, duracaoMs, aoTerminar) {
   const anguloFinal = Estado.anguloAtual + voltas * Math.PI * 2 + deltaAteAlvo;
 
   const anguloInicioAnimacao = Estado.anguloAtual;
-  const inicio = performance.now();
+  const reduzirMovimento = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const duracaoEfetiva = reduzirMovimento ? Math.min(600, duracaoMs) : duracaoMs;
+  const canvas = Roleta.canvas;
+  let terminou = false;
 
-  function passo(agora) {
-    const t = Math.min(1, (agora - inicio) / duracaoMs);
-    const progresso = easeOutQuint(t);
-    Estado.anguloAtual = anguloInicioAnimacao + (anguloFinal - anguloInicioAnimacao) * progresso;
-    Roleta.desenhar(Estado.anguloAtual);
-
-    if (t < 1) {
-      requestAnimationFrame(passo);
-    } else {
-      Estado.anguloAtual = Estado.anguloAtual % (Math.PI * 2);
-      aoTerminar();
+  function concluir() {
+    if (terminou) return;
+    terminou = true;
+    Estado.anguloAtual = normalizarAngulo(anguloFinal);
+    Roleta.aplicarRotacao(Estado.anguloAtual);
+    canvas?.classList.remove("esta-girando");
+    if (Roleta.animacao) {
+      Roleta.animacao.cancel();
+      Roleta.animacao = null;
     }
+    aoTerminar();
   }
+
+  if (canvas && typeof canvas.animate === "function") {
+    canvas.classList.add("esta-girando");
+    Roleta.animacao = canvas.animate(
+      [
+        { transform: `rotate(${anguloInicioAnimacao}rad)` },
+        { transform: `rotate(${anguloFinal}rad)` }
+      ],
+      {
+        duration: duracaoEfetiva,
+        easing: "cubic-bezier(0.12, 0.76, 0.18, 1)",
+        fill: "forwards"
+      }
+    );
+    Roleta.animacao.addEventListener("finish", concluir, { once: true });
+    return;
+  }
+
+  // Compatibilidade com navegadores antigos: ainda movimenta só a camada
+  // do canvas, sem redesenhar fatias e textos a cada quadro.
+  const inicio = performance.now();
+  function passo(agora) {
+    const t = Math.min(1, (agora - inicio) / duracaoEfetiva);
+    const progresso = 1 - Math.pow(1 - t, 5);
+    Estado.anguloAtual = anguloInicioAnimacao + (anguloFinal - anguloInicioAnimacao) * progresso;
+    Roleta.aplicarRotacao(Estado.anguloAtual);
+    if (t < 1) requestAnimationFrame(passo);
+    else concluir();
+  }
+  canvas?.classList.add("esta-girando");
   requestAnimationFrame(passo);
 }
 
@@ -566,13 +608,25 @@ export const Confete = {
   ctx: null,
   particulas: [],
   animando: false,
+  ultimoQuadro: 0,
+  qualidade: 1,
+  resizePendente: false,
 
   iniciar() {
     this.canvas = document.getElementById("canvasConfete");
     if (!this.canvas) return;
-    this.ctx = this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext("2d", { alpha: true, desynchronized: true });
+    const poucosNucleos = Number(navigator.hardwareConcurrency || 4) <= 4;
+    this.qualidade = window.innerWidth <= 720 || poucosNucleos ? 0.55 : 0.8;
     this.redimensionar();
-    window.addEventListener("resize", () => this.redimensionar());
+    window.addEventListener("resize", () => {
+      if (this.resizePendente) return;
+      this.resizePendente = true;
+      requestAnimationFrame(() => {
+        this.resizePendente = false;
+        this.redimensionar();
+      });
+    }, { passive: true });
   },
 
   redimensionar() {
@@ -582,9 +636,14 @@ export const Confete = {
 
   explodir(cores = ["#C9A227", "#E8C766", "#1F9D6B", "#ffffff"], quantidade = 140, origemX = null, origemY = null) {
     if (!this.canvas) return;
+    const reduzirMovimento = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const quantidadeEfetiva = Math.min(
+      reduzirMovimento ? 36 : Math.round(quantidade * this.qualidade),
+      Math.max(0, 600 - this.particulas.length)
+    );
     const x = origemX !== null ? origemX : this.canvas.width / 2;
     const y = origemY !== null ? origemY : this.canvas.height / 2;
-    for (let i = 0; i < quantidade; i++) {
+    for (let i = 0; i < quantidadeEfetiva; i++) {
       this.particulas.push({
         x, y,
         vx: (Math.random() - 0.5) * 16,
@@ -596,44 +655,56 @@ export const Confete = {
         rotacao: Math.random() * Math.PI
       });
     }
-    if (!this.animando) { this.animando = true; this._loop(); }
+    if (!this.animando && quantidadeEfetiva > 0) {
+      this.animando = true;
+      this.ultimoQuadro = performance.now();
+      requestAnimationFrame((agora) => this._loop(agora));
+    }
   },
 
   fogosDeArtificio(cores = ["#C9A227", "#E8C766", "#1F9D6B", "#ffffff", "#5DADE2"], rajadas = 6) {
     if (!this.canvas) return;
-    for (let i = 0; i < rajadas; i++) {
+    const reduzirMovimento = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const totalRajadas = reduzirMovimento ? 1 : Math.min(rajadas, this.qualidade < 0.7 ? 4 : 5);
+    for (let i = 0; i < totalRajadas; i++) {
       const atraso = i * 260 + Math.random() * 150;
       setTimeout(() => {
         const x = this.canvas.width * (0.18 + Math.random() * 0.64);
         const y = this.canvas.height * (0.18 + Math.random() * 0.4);
-        this.explodir(cores, 90 + Math.floor(Math.random() * 60), x, y);
+        this.explodir(cores, 80 + Math.floor(Math.random() * 45), x, y);
       }, atraso);
     }
-    setTimeout(() => this.explodir(cores, 220), rajadas * 260);
+    if (!reduzirMovimento) setTimeout(() => this.explodir(cores, 150), totalRajadas * 260);
   },
 
-  _loop() {
+  _loop(agora) {
     const { ctx, canvas } = this;
+    const passo = Math.min(2, Math.max(0.5, (agora - this.ultimoQuadro) / 16.67));
+    this.ultimoQuadro = agora;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    this.particulas.forEach((p) => {
-      p.vy += 0.28;
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vida++;
-      p.rotacao += 0.15;
+    let quantidadeAtiva = 0;
+    for (const p of this.particulas) {
+      p.vy += 0.28 * passo;
+      p.x += p.vx * passo;
+      p.y += p.vy * passo;
+      p.vida += passo;
+      p.rotacao += 0.15 * passo;
+      if (p.vida >= p.vidaMax) continue;
       const opacidade = Math.max(0, 1 - p.vida / p.vidaMax);
-      ctx.save();
       ctx.globalAlpha = opacidade;
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rotacao);
+      const cosseno = Math.cos(p.rotacao);
+      const seno = Math.sin(p.rotacao);
+      ctx.setTransform(cosseno, seno, -seno, cosseno, p.x, p.y);
       ctx.fillStyle = p.cor;
       ctx.fillRect(-p.tamanho / 2, -p.tamanho / 2, p.tamanho, p.tamanho * 0.6);
-      ctx.restore();
-    });
-    this.particulas = this.particulas.filter((p) => p.vida < p.vidaMax);
+      this.particulas[quantidadeAtiva++] = p;
+    }
+    this.particulas.length = quantidadeAtiva;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
 
     if (this.particulas.length > 0) {
-      requestAnimationFrame(() => this._loop());
+      requestAnimationFrame((proximoAgora) => this._loop(proximoAgora));
     } else {
       this.animando = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);

@@ -57,12 +57,21 @@ if (/registrarGiro|FILA_PENDENTE|tentarReenviarPendentes/.test(codigoCliente)) {
 }
 
 const fluxoPublico = readFileSync(resolve(raiz, "roleta-app.js"), "utf8");
+const nucleo = readFileSync(resolve(raiz, "core.js"), "utf8");
 for (const [teste, mensagem] of [
   [/tocarSom\("audioGiro"\)/, "O giro não inicia seu áudio."],
   [/pararSom\("audioGiro"\)/, "O giro não interrompe seu áudio ao terminar."],
   [/premio\.positivo[\s\S]*tocarSom\("audioVitoria"\)[\s\S]*else[\s\S]*tocarSom\("audioDerrota"\)/, "Os sons positivo e negativo não estão separados corretamente."]
 ]) {
   if (!teste.test(fluxoPublico)) throw new Error(mensagem);
+}
+
+if (!/canvas\.animate\([\s\S]*?cubic-bezier/.test(nucleo)) {
+  throw new Error("A roleta deve usar animação de composição acelerada pelo navegador.");
+}
+const corpoGiro = nucleo.match(/export function girarRoleta\([\s\S]*?\n}\n\n\/\* ={10,}/)?.[0] || "";
+if (/Roleta\.desenhar\(/.test(corpoGiro)) {
+  throw new Error("O giro não deve redesenhar todas as fatias a cada quadro.");
 }
 
 console.log("Verificação estática concluída com sucesso.");

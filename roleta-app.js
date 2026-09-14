@@ -11,7 +11,7 @@ import {
   sortearGiroRemoto, gerarIdSeguro, girarRoleta, validarConfiguracao,
   adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela
-} from "./core.js?v=20260903-layout";
+} from "./core.js?v=20260914-performance";
 
 let trocandoPerfil = false;
 
@@ -80,9 +80,10 @@ function renderizarMenuPerfis(nomes) {
   marcarPerfilSelecionado();
 }
 
-async function carregarMenuPerfis() {
+async function carregarMenuPerfis(promessaPerfis = null) {
   try {
-    const dados = await listarPerfisPublicosRemoto();
+    const dados = promessaPerfis ? await promessaPerfis : await listarPerfisPublicosRemoto();
+    if (!dados) throw new Error("Menu temporariamente indisponível.");
     renderizarMenuPerfis(dados.perfis);
   } catch (erro) {
     // Compatibilidade temporária com uma implantação antiga do Apps Script:
@@ -215,6 +216,9 @@ function configurarTelaCheia() {
 }
 
 async function iniciarAplicacao() {
+  // Configuração ativa e nomes do menu são independentes: buscá-los juntos
+  // reduz quase pela metade a espera em conexões com maior latência.
+  const promessaPerfis = listarPerfisPublicosRemoto().catch(() => null);
   const { nome, config } = await obterConfigParaExibir();
   Estado.config = config;
   Estado.nomePerfilAtivo = nome;
@@ -228,7 +232,13 @@ async function iniciarAplicacao() {
   ModalNome.iniciar();
   ModalResultado.iniciar();
   configurarTelaCheia();
-  carregarMenuPerfis();
+  carregarMenuPerfis(promessaPerfis);
+
+  // O primeiro desenho nunca depende da fonte web; quando ela terminar de
+  // carregar, fazemos um único refinamento dos textos fora de qualquer giro.
+  document.fonts?.ready.then(() => {
+    if (!Estado.girando) Roleta.desenhar(Estado.anguloAtual);
+  });
 
   document.getElementById("btnGirar").addEventListener("click", () => {
     if (Estado.girando) return;

@@ -241,11 +241,19 @@ input, select { font-family: inherit; }
 }
 
 #canvasRoleta {
+  display: block;
   width: 100%;
   height: 100%;
   border-radius: 50%;
   filter: drop-shadow(0 0 55px rgba(201, 162, 39, 0.28));
-  transition: transform 0.2s linear;
+  transform: rotate(0rad);
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+  touch-action: manipulation;
+}
+
+#canvasRoleta.esta-girando {
+  will-change: transform;
 }
 
 .ponteiro {

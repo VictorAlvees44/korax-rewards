@@ -16,6 +16,7 @@ alternativo.empresa.tituloRoleta = "Roleta da Convenção";
 alternativo.premios = alternativo.premios.slice(0, 4);
 const perfis = new Map([["Teste local", inicial], ["Convenção Korax", alternativo]]);
 let ativo = { nome: "Teste local", config: structuredClone(inicial) };
+let numeroGiroFicticio = 0;
 const arquivos = new Map([
   ["/", ["index.html", "text/html"]],
   ["/index.html", ["index.html", "text/html"]],
@@ -62,6 +63,24 @@ const servidor = createServer(async (req, res) => {
         if (corpo.length > 8 * 1024 * 1024) throw new Error("Perfil muito grande.");
       }
       const dados = JSON.parse(corpo);
+      if (dados.acao === "sortearGiro") {
+        const nomePerfil = dados.perfil && perfis.has(dados.perfil) ? dados.perfil : ativo.nome;
+        const configPerfil = perfis.get(nomePerfil) || ativo.config;
+        const premio = configPerfil.premios[numeroGiroFicticio++ % configPerfil.premios.length];
+        responder({
+          status: "sucesso",
+          dados: {
+            idGiro: dados.idGiro,
+            nome: String(dados.nome || "Participante fictício"),
+            perfil: nomePerfil,
+            premio,
+            premios: configPerfil.premios,
+            data: "14/09/2026",
+            hora: "10:00:00"
+          }
+        });
+        return;
+      }
       if (dados.adminSecret !== "local-test-only") throw new Error("Use o segredo fictício local-test-only.");
       switch (dados.acao) {
         case "autenticarAdmin": responder({ status: "sucesso" }); break;
@@ -75,7 +94,7 @@ const servidor = createServer(async (req, res) => {
           break;
         }
         case "excluirPerfil": perfis.delete(dados.nome); responder({ status: "sucesso" }); break;
-        default: throw new Error("Ação indisponível. Giros oficiais não são executados neste teste.");
+        default: throw new Error("Ação indisponível neste teste.");
       }
       return;
     }
