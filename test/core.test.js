@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme } from "../core.js";
+import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme, carregarHistorico, adicionarHistorico, CHAVE_HISTORICO } from "../core.js";
 
 const config = JSON.parse(readFileSync(new URL("../config.json", import.meta.url), "utf8"));
 
@@ -13,6 +13,30 @@ test("a configuração associa os três sons aos eventos corretos", () => {
   assert.equal(config.sons.giro, "assets/audio/roleta-girando.mp3");
   assert.equal(config.sons.vitoria, "assets/audio/palmas.mp3");
   assert.equal(config.sons.derrota, "assets/audio/naruto-sad.mp3");
+});
+
+test("histórico local conserva somente nome e data, inclusive ao migrar registros antigos", () => {
+  const anterior = globalThis.localStorage;
+  const itens = new Map([
+    ["roletaCorp_historico_v2", JSON.stringify([{ nome: "Maria", data: "16/09/2026", premio: "Chocolate", perfil: "Comercial", hora: "10:00" }])]
+  ]);
+  globalThis.localStorage = {
+    getItem: (chave) => itens.has(chave) ? itens.get(chave) : null,
+    setItem: (chave, valor) => itens.set(chave, valor),
+    removeItem: (chave) => itens.delete(chave)
+  };
+  try {
+    assert.deepEqual(carregarHistorico(), [{ nome: "Maria", data: "16/09/2026" }]);
+    assert.equal(itens.has("roletaCorp_historico_v2"), false);
+    adicionarHistorico({ nome: "João", data: "16/09/2026", premio: "Vale Café" });
+    assert.deepEqual(JSON.parse(itens.get(CHAVE_HISTORICO)), [
+      { nome: "João", data: "16/09/2026" },
+      { nome: "Maria", data: "16/09/2026" }
+    ]);
+  } finally {
+    if (anterior === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = anterior;
+  }
 });
 
 test("rejeita IDs de prêmio duplicados", () => {

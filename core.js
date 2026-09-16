@@ -15,7 +15,7 @@
  */
 
 export const CHAVE_CACHE_CONFIG_ATIVO = "roletaCorp_cache_config_ativo_v2";
-export const CHAVE_HISTORICO = "roletaCorp_historico_v2";
+export const CHAVE_HISTORICO = "roletaCorp_historico_minimo_v3";
 export const CHAVE_CLIENTE = "roletaCorp_cliente_v3";
 
 let segredoAdmin = "";
@@ -60,14 +60,14 @@ async function chamarBackendGet(acao, params = {}) {
   return dados;
 }
 
-async function chamarBackendPost(corpo) {
+async function chamarBackendPost(corpo, timeoutMs = 15000) {
   const url = obterUrlBackend();
   if (!url) throw new Error("URL do Web App não configurada em config.js.");
   const resposta = await fetchComTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS no Apps Script
     body: JSON.stringify(corpo)
-  });
+  }, timeoutMs);
   const dados = await resposta.json();
   if (dados.status !== "sucesso") throw new Error(dados.mensagem || "Erro desconhecido no backend.");
   return dados;
@@ -93,7 +93,7 @@ export function configurarCredencialAdmin(valor) {
 }
 
 export async function autenticarAdminRemoto(valor) {
-  await chamarBackendPost({ acao: "autenticarAdmin", adminSecret: String(valor || "") });
+  await chamarBackendPost({ acao: "autenticarAdmin", adminSecret: String(valor || "") }, 30000);
   configurarCredencialAdmin(valor);
   return true;
 }
@@ -118,7 +118,7 @@ export async function buscarPerfilPublicoRemoto(nome) {
 
 /** Lista todos os perfis salvos na "biblioteca" central. */
 export async function listarPerfisRemoto() {
-  const dados = await chamarBackendPost({ acao: "listarPerfis", adminSecret: segredoAdmin });
+  const dados = await chamarBackendPost({ acao: "listarPerfis", adminSecret: segredoAdmin }, 30000);
   return dados.perfis || {}; // { nomeDoPerfil: config, ... }
 }
 
@@ -222,13 +222,32 @@ export async function obterConfigParaExibir() {
    ======================================================================== */
 
 export function carregarHistorico() {
-  try { return JSON.parse(localStorage.getItem(CHAVE_HISTORICO)) || []; }
+  try {
+    const chaveAntiga = "roletaCorp_historico_v2";
+    const antigo = localStorage.getItem(chaveAntiga);
+    if (antigo !== null) {
+      let anteriores = [];
+      try { anteriores = JSON.parse(antigo); } catch (e) { /* histórico antigo inválido */ }
+      const novos = JSON.parse(localStorage.getItem(CHAVE_HISTORICO)) || [];
+      const reduzidos = [...(Array.isArray(novos) ? novos : []), ...(Array.isArray(anteriores) ? anteriores : [])]
+        .map((registro) => ({ nome: String(registro?.nome || ""), data: String(registro?.data || "") }))
+        .filter((registro) => registro.nome && registro.data)
+        .slice(0, 200);
+      localStorage.setItem(CHAVE_HISTORICO, JSON.stringify(reduzidos));
+      localStorage.removeItem(chaveAntiga);
+    }
+    const registros = JSON.parse(localStorage.getItem(CHAVE_HISTORICO)) || [];
+    if (!Array.isArray(registros)) return [];
+    return registros
+      .map((registro) => ({ nome: String(registro?.nome || ""), data: String(registro?.data || "") }))
+      .filter((registro) => registro.nome && registro.data);
+  }
   catch (e) { return []; }
 }
 
 export function adicionarHistorico(registro) {
   const historico = carregarHistorico();
-  historico.unshift(registro);
+  historico.unshift({ nome: String(registro?.nome || ""), data: String(registro?.data || "") });
   localStorage.setItem(CHAVE_HISTORICO, JSON.stringify(historico.slice(0, 200)));
 }
 

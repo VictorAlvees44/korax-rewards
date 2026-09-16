@@ -14,10 +14,14 @@ import {
   gerarId, gerarCorAleatoria, corrigirCoresRepetidas, mostrarToast, carregarHistorico,
   aplicarVisualNaTela, carregarSonsNosElementos, sortearPremioAleatorio,
   girarRoleta, obterUrlBackend
-} from "../core.js?v=20260903-sons";
+} from "../core.js?v=20260916-admin";
 
 let Perfis = {}; // cache local em memória do que veio do backend: { nome: config }
 let painelOcupado = false;
+let perfisCarregados = false;
+let carregandoPerfis = null;
+let painelConfigurado = false;
+let painelPronto = false;
 const CHAVE_SESSAO_ADMIN = "roletaCorp_admin_secret_v1";
 const TAMANHO_MAX_UPLOAD = 2 * 1024 * 1024;
 
@@ -44,7 +48,7 @@ function configurarAbas() {
         secao.classList.toggle("oculto", secao.dataset.conteudo !== alvo);
       });
       if (alvo === "historico" || alvo === "estatisticas") HistoricoEstatisticas.atualizar();
-      if (alvo === "perfis") renderizarListaPerfis();
+      if (alvo === "perfis") carregarBibliotecaPerfis().catch((erro) => mostrarToast("Não foi possível carregar os perfis: " + erro.message));
     });
   });
 }
@@ -267,6 +271,9 @@ function configurarPerfis() {
     if (!nome) { mostrarToast("Digite um nome para o perfil."); return; }
     if (!obterUrlBackend()) { mostrarToast("Configure a URL do backend na aba Configurações antes de salvar."); return; }
 
+    try { await carregarBibliotecaPerfis(); }
+    catch (erro) { mostrarToast("Não foi possível conferir os perfis existentes: " + erro.message); return; }
+
     if (Perfis[nome] && nome !== Estado.nomePerfilAtivo && !confirm(`Já existe um perfil chamado "${nome}". Substituir?`)) return;
 
     const configSalva = structuredClone(Estado.config);
@@ -405,6 +412,25 @@ function renderizarListaPerfis() {
   });
 }
 
+async function carregarBibliotecaPerfis() {
+  if (perfisCarregados) { renderizarListaPerfis(); return; }
+  if (carregandoPerfis) return carregandoPerfis;
+  const lista = document.getElementById("listaPerfis");
+  lista.textContent = "Carregando perfis salvos…";
+  carregandoPerfis = listarPerfisRemoto()
+    .then((perfis) => {
+      Perfis = { ...perfis, ...Perfis };
+      perfisCarregados = true;
+      renderizarListaPerfis();
+    })
+    .catch((erro) => {
+      lista.textContent = "Não foi possível carregar os perfis. Abra esta aba novamente para tentar outra vez.";
+      throw erro;
+    })
+    .finally(() => { carregandoPerfis = null; });
+  return carregandoPerfis;
+}
+
 /* ========================================================================
    CONFIGURAÇÕES GERAIS
    ======================================================================== */
@@ -476,54 +502,16 @@ const HistoricoEstatisticas = {
       const tr = document.createElement("tr");
       const celula = (texto) => { const td = document.createElement("td"); td.textContent = texto; return td; };
       tr.appendChild(celula(registro.nome));
-      tr.appendChild(celula(registro.premio));
-      tr.appendChild(celula(registro.perfil || "-"));
       tr.appendChild(celula(registro.data));
-      tr.appendChild(celula(registro.hora));
       corpo.appendChild(tr);
     });
   },
 
   _renderizarEstatisticas(historico) {
     document.getElementById("estatTotalGiros").textContent = historico.length;
-    const contagem = {};
-    historico.forEach((r) => { contagem[r.premio] = (contagem[r.premio] || 0) + 1; });
-    const entradas = Object.entries(contagem);
-
-    if (entradas.length === 0) {
-      document.getElementById("estatMaisSorteado").textContent = "-";
-      document.getElementById("estatMenosSorteado").textContent = "-";
-      this._desenharGrafico([]);
-      return;
-    }
-    entradas.sort((a, b) => b[1] - a[1]);
-    document.getElementById("estatMaisSorteado").textContent = entradas[0][0];
-    document.getElementById("estatMenosSorteado").textContent = entradas[entradas.length - 1][0];
-    this._desenharGrafico(entradas);
-  },
-
-  _desenharGrafico(entradas) {
-    const canvas = document.getElementById("canvasGrafico");
-    canvas.width = canvas.clientWidth;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (entradas.length === 0) return;
-
-    const maximo = Math.max(...entradas.map((e) => e[1]));
-    const larguraBarra = canvas.width / entradas.length;
-
-    entradas.forEach(([nome, valor], i) => {
-      const alturaBarra = (valor / maximo) * (canvas.height - 40);
-      const x = i * larguraBarra + 10;
-      const y = canvas.height - alturaBarra - 24;
-      ctx.fillStyle = "#C9A227";
-      ctx.fillRect(x, y, larguraBarra - 20, alturaBarra);
-      ctx.fillStyle = "#F5F3EE";
-      ctx.font = "12px Inter, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(nome.slice(0, 10), x + (larguraBarra - 20) / 2, canvas.height - 6);
-      ctx.fillText(String(valor), x + (larguraBarra - 20) / 2, y - 6);
-    });
+    const participantes = new Set(historico.map((registro) => registro.nome.trim().toLocaleLowerCase("pt-BR")));
+    document.getElementById("estatParticipantes").textContent = participantes.size;
+    document.getElementById("estatUltimaData").textContent = historico[0]?.data || "-";
   }
 };
 
@@ -553,20 +541,23 @@ function preencherCampos() {
   carregarSonsNosElementos(c);
 }
 
-async function iniciarPainel() {
-  // Carrega primeiro para que uma falha de backend não registre listeners
-  // duplicados quando o usuário tentar entrar novamente.
-  Perfis = await listarPerfisRemoto();
+async function iniciarPainel(promessaAtivo) {
+  if (painelPronto) return;
+  if (!painelConfigurado) {
+    configurarAbas();
+    configurarPremios();
+    configurarVisual();
+    configurarSons();
+    configurarPerfis();
+    configurarConfiguracoesGerais();
+    painelConfigurado = true;
+  }
 
-  configurarAbas();
-  configurarPremios();
-  configurarVisual();
-  configurarSons();
-  configurarPerfis();
-  configurarConfiguracoesGerais();
-
-  let ativo = null;
-  try { ativo = await buscarConfigAtivoRemoto(); } catch (e) { /* segue sem ativo */ }
+  // Não abrir um perfil de fábrica para edição se a leitura remota falhar:
+  // isso poderia fazer alguém publicar por engano sobre a campanha ativa.
+  const leituraAtivo = await promessaAtivo;
+  if (leituraAtivo.erro) throw leituraAtivo.erro;
+  const ativo = leituraAtivo.ativo;
 
   if (ativo && ativo.config) {
     Estado.config = ativo.config;
@@ -588,6 +579,7 @@ async function iniciarPainel() {
   atualizarRotuloPerfilAtual();
   Roleta.iniciar("canvasRoleta");
   HistoricoEstatisticas.atualizar();
+  painelPronto = true;
 }
 
 function configurarLoginAdmin() {
@@ -599,26 +591,48 @@ function configurarLoginAdmin() {
 
   const entrar = async (segredo) => {
     botao.disabled = true;
+    botao.textContent = "Verificando acesso…";
     erro.classList.add("oculto");
+    // O perfil ativo já é público; podemos buscá-lo enquanto o servidor
+    // valida a credencial, sem antecipar qualquer operação administrativa.
+    const promessaAtivo = buscarConfigAtivoRemoto().then(
+      (ativo) => ({ ativo }),
+      (falha) => ({ erro: falha })
+    );
     try {
       await autenticarAdminRemoto(segredo);
-      sessionStorage.setItem(CHAVE_SESSAO_ADMIN, segredo);
-      tela.classList.add("oculto");
-      const painel = document.getElementById("painelAdmin");
-      painel.removeAttribute("inert");
-      painel.setAttribute("aria-hidden", "false");
-      await iniciarPainel();
     } catch (falha) {
       configurarCredencialAdmin("");
       sessionStorage.removeItem(CHAVE_SESSAO_ADMIN);
-      erro.textContent = falha.message;
+      erro.textContent = /demorou demais/.test(falha.message)
+        ? "O Apps Script levou mais de 30 segundos para validar o acesso. Verifique a conexão e tente novamente."
+        : falha.message;
       erro.classList.remove("oculto");
       tela.classList.remove("oculto");
       const painel = document.getElementById("painelAdmin");
       painel.setAttribute("inert", "");
       painel.setAttribute("aria-hidden", "true");
       input.focus();
+      botao.textContent = "Entrar";
+      botao.disabled = false;
+      return;
+    }
+
+    sessionStorage.setItem(CHAVE_SESSAO_ADMIN, segredo);
+    botao.textContent = "Carregando roleta…";
+    try {
+      await iniciarPainel(promessaAtivo);
+      tela.classList.add("oculto");
+      const painel = document.getElementById("painelAdmin");
+      painel.removeAttribute("inert");
+      painel.setAttribute("aria-hidden", "false");
+      input.value = "";
+    } catch (falha) {
+      erro.textContent = "Acesso autorizado, mas a roleta ativa não carregou: " + falha.message + " Tente entrar novamente.";
+      erro.classList.remove("oculto");
+      // O segredo validado continua na sessão; isto não é falha de login.
     } finally {
+      botao.textContent = "Entrar";
       botao.disabled = false;
     }
   };

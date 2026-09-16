@@ -47,6 +47,9 @@ if (!paginaPublica.includes('id="listaPerfisPublicos"') || !paginaPublica.includ
 if (!/acao === "perfisPublicos"/.test(gas) || !/acao === "perfilPublico"/.test(gas)) {
   throw new Error("O backend deve expor os perfis usados pelo menu público.");
 }
+if (!/var CABECALHO = \["Nome", "Data"\]/.test(gas)) {
+  throw new Error("A planilha operacional deve registrar somente Nome e Data.");
+}
 
 const codigoCliente = arquivosJs.map((arquivo) => readFileSync(resolve(raiz, arquivo), "utf8")).join("\n");
 if (/\.innerHTML\s*=|insertAdjacentHTML|document\.write\s*\(|\beval\s*\(/.test(codigoCliente)) {

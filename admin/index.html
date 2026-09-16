@@ -8,6 +8,7 @@
 <title>Admin — Roleta da Sorte Corporativa</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://script.google.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Poppins:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../style.css?v=20260914-contrast">
 </head>
@@ -193,14 +194,13 @@
   <!-- ABA HISTORICO -->
   <div class="painel__conteudo oculto" data-conteudo="historico">
     <p class="painel__dica">
-      Este histórico é apenas um espelho local (deste navegador) dos últimos
-      giros, para consulta rápida durante o evento. O registro oficial e
-      completo, separado por layout e por mês, fica na planilha do Google
-      Sheets vinculada ao backend.
+      Este histórico é apenas um espelho local dos últimos giros. O registro
+      oficial na planilha do Google Sheets contém somente o nome da pessoa e
+      a data do giro.
     </p>
     <table class="tabela">
       <thead>
-        <tr><th>Nome</th><th>Prêmio</th><th>Perfil</th><th>Data</th><th>Hora</th></tr>
+        <tr><th>Nome</th><th>Data</th></tr>
       </thead>
       <tbody id="corpoHistorico"></tbody>
     </table>
@@ -214,15 +214,14 @@
         <span class="cartao-estat__rotulo">Giros realizados (neste navegador)</span>
       </div>
       <div class="cartao-estat">
-        <span class="cartao-estat__valor" id="estatMaisSorteado">-</span>
-        <span class="cartao-estat__rotulo">Prêmio mais sorteado</span>
+        <span class="cartao-estat__valor" id="estatParticipantes">0</span>
+        <span class="cartao-estat__rotulo">Participantes diferentes</span>
       </div>
       <div class="cartao-estat">
-        <span class="cartao-estat__valor" id="estatMenosSorteado">-</span>
-        <span class="cartao-estat__rotulo">Prêmio menos sorteado</span>
+        <span class="cartao-estat__valor" id="estatUltimaData">-</span>
+        <span class="cartao-estat__rotulo">Data do último giro</span>
       </div>
     </div>
-    <canvas id="canvasGrafico" class="grafico" height="220"></canvas>
   </div>
 </section>
 
@@ -235,6 +234,6 @@
 <audio id="audioParada"></audio>
 
 <script src="../config.js?v=20260903-sons"></script>
-<script src="admin-app.js?v=20260903-campos" type="module"></script>
+<script src="admin-app.js?v=20260916-admin" type="module"></script>
 </body>
 </html>

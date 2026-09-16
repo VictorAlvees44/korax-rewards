@@ -55,6 +55,7 @@ test("a configuração do servidor descarta pesos legados", () => {
 test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {
   const ctx = backend();
   const linhas = [];
+  const controle = [];
   let sorteios = 0;
   ctx.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
   ctx.buscarGiroNoControle = () => null;
@@ -63,11 +64,10 @@ test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {
   ctx.indiceAleatorioSeguro = (quantidade) => { assert.equal(quantidade, config.premios.length); sorteios++; return 2; };
   ctx.Session = { getScriptTimeZone: () => "America/Sao_Paulo" };
   ctx.Utilities.formatDate = (_, __, formato) => formato === "dd/MM/yyyy" ? "03/09/2026" : "12:00:00";
-  ctx.obterAbaDoLayoutNoMes = () => ({ appendRow: (linha) => linhas.push(linha), getLastRow: () => 2, getName: () => "Comercial - 09-2026" });
+  ctx.obterAbaRegistrosDoMes = () => ({ appendRow: (linha) => linhas.push(linha) });
   ctx.garantirCabecalhoAtual = () => {};
-  ctx.obterAbaControle = () => ({ appendRow() {} });
+  ctx.obterAbaControle = () => ({ appendRow: (linha) => controle.push(linha) });
   ctx.enviarEmailNotificacao = () => {};
-  ctx.atualizarStatusEmail = () => {};
 
   const resultado = ctx.sortearERegistrarGiro({
     idGiro: "1234567890abcdef", clienteId: "cliente-local", nome: "Teste local",
@@ -76,6 +76,10 @@ test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {
   assert.equal(resultado.dados.premio.id, config.premios[2].id);
   assert.equal(resultado.dados.perfil, "Comercial");
   assert.equal(linhas.length, 1);
+  assert.deepEqual(Array.from(linhas[0]), ["Teste local", "03/09/2026"]);
+  assert.equal(controle.length, 1);
+  assert.equal(controle[0].length, 4);
+  assert.ok(!controle[0].includes("Teste local"));
   assert.equal(sorteios, 1);
 
   ctx.buscarGiroNoControle = () => resultado.dados;
@@ -100,11 +104,10 @@ test("o servidor sorteia somente dentro do perfil salvo que foi selecionado", ()
   ctx.indiceAleatorioSeguro = () => 0;
   ctx.Session = { getScriptTimeZone: () => "America/Sao_Paulo" };
   ctx.Utilities.formatDate = (_, __, formato) => formato === "dd/MM/yyyy" ? "03/09/2026" : "12:00:00";
-  ctx.obterAbaDoLayoutNoMes = () => ({ appendRow() {}, getLastRow: () => 2, getName: () => "Feira Korax - 09-2026" });
+  ctx.obterAbaRegistrosDoMes = () => ({ appendRow() {} });
   ctx.garantirCabecalhoAtual = () => {};
   ctx.obterAbaControle = () => ({ appendRow() {} });
   ctx.enviarEmailNotificacao = () => {};
-  ctx.atualizarStatusEmail = () => {};
 
   const resultado = ctx.sortearERegistrarGiro({
     idGiro: "abcdef1234567890", clienteId: "cliente-local", nome: "Teste local", perfil: "Feira Korax",
@@ -112,4 +115,38 @@ test("o servidor sorteia somente dentro do perfil salvo que foi selecionado", ()
   });
   assert.equal(resultado.dados.perfil, "Feira Korax");
   assert.equal(resultado.dados.premio.nome, "Item exclusivo da feira");
+});
+
+test("notificação administrativa contém somente nome e data", () => {
+  const ctx = backend();
+  let enviado;
+  ctx.PropertiesService = { getScriptProperties: () => ({ getProperty: () => "equipe@example.com" }) };
+  ctx.MailApp = { sendEmail: (...argumentos) => { enviado = argumentos; } };
+  ctx.enviarEmailNotificacao({
+    idGiro: "1234567890abcdef", nome: "Maria", data: "16/09/2026",
+    premio: { nome: "Chocolate", positivo: true }, perfil: "Comercial"
+  });
+  assert.equal(enviado[0], "equipe@example.com");
+  assert.match(enviado[2], /Nome: Maria\nData: 16\/09\/2026/);
+  assert.doesNotMatch(enviado[2], /Chocolate|Comercial|1234567890abcdef|Tipo:|Hora:/);
+});
+
+test("requisição repetida preserva resultado sem criar novo registro", () => {
+  const ctx = backend();
+  const instante = new Date("2026-09-16T12:00:00Z");
+  ctx.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
+  ctx.buscarGiroNoControle = () => ({
+    idGiro: "1234567890abcdef", premio: config.premios[0],
+    perfil: "Comercial", registradoEm: instante
+  });
+  ctx.Session = { getScriptTimeZone: () => "America/Sao_Paulo" };
+  ctx.Utilities.formatDate = () => "16/09/2026";
+  ctx.obterConfigAtivo = () => ({ nome: "Comercial", config });
+  const resposta = ctx.sortearERegistrarGiro({
+    idGiro: "1234567890abcdef", clienteId: "cliente-local", nome: "Maria"
+  });
+  assert.equal(resposta.duplicado, true);
+  assert.equal(resposta.dados.nome, "Maria");
+  assert.equal(resposta.dados.premio.id, config.premios[0].id);
+  assert.equal(resposta.dados.data, "16/09/2026");
 });

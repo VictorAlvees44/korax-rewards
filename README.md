@@ -1,6 +1,6 @@
 # Korax Rewards — Roleta da Sorte
 
-Roleta corporativa para campanhas e eventos, publicada no GitHub Pages e integrada a um backend Google Apps Script. O servidor escolhe e registra cada resultado de forma autoritativa, organiza os giros por perfil e mês no Google Sheets e envia notificações por e-mail.
+Roleta corporativa para campanhas e eventos, publicada no GitHub Pages e integrada a um backend Google Apps Script. O servidor escolhe cada resultado de forma autoritativa. O registro operacional no Google Sheets e a notificação por e-mail contêm somente nome da pessoa e data do giro.
 
 Produção: <https://victoralvees44.github.io/korax-rewards/>
 
@@ -25,13 +25,14 @@ Painel /admin ── segredo em sessionStorage ──> validação com ADMIN_SEC
 
 - O navegador não escolhe nem informa o prêmio: o Apps Script sorteia, grava e devolve o resultado.
 - O menu público lista os perfis salvos. Ao trocar de perfil, o servidor carrega sua configuração e limita o sorteio oficial aos itens desse perfil; o navegador nunca escolhe o resultado.
-- Cada giro possui ID aleatório e uma aba de controle oculta impede registros duplicados.
+- Cada giro possui ID aleatório e uma aba de controle técnica, oculta e sem o nome do participante, impede registros duplicados.
 - Se o backend falhar, nenhum resultado não oficial é exibido. A aplicação requer internet para girar.
-- Data e hora registradas vêm do servidor, no fuso `America/Sao_Paulo`.
+- A data registrada vem do servidor, no fuso `America/Sao_Paulo`.
 - Dados gravados no Sheets são neutralizados contra fórmulas maliciosas.
 - Alterar, publicar, listar ou excluir perfis exige `ADMIN_SECRET`.
 - O segredo administrativo permanece apenas na memória do módulo e no `sessionStorage` da aba; nunca é gravado no repositório ou enviado em URL.
 - O backend limita cada identificador de navegador a 20 giros por janela de cinco minutos. Esse limite reduz abuso acidental, mas não substitui CAPTCHA/WAF quando o link for divulgado em larga escala.
+- O painel valida a senha em uma chamada curta, carrega só o perfil ativo na entrada e busca a biblioteca completa apenas ao abrir **Perfis**. Lentidão na biblioteca não faz o login parecer inválido.
 
 ## Implantar o Google Apps Script
 
@@ -51,6 +52,8 @@ Painel /admin ── segredo em sessionStorage ──> validação com ADMIN_SEC
 6. Autorize explicitamente Google Drive, planilha e envio de e-mail.
 7. Copie a URL terminada em `/exec` e atualize `webhook.url` em `config.js` e `config.json`.
 8. Após qualquer alteração no backend, use **Gerenciar implantações → Editar → Nova versão**. Salvar `Code.gs` sem criar uma nova versão não atualiza a produção.
+
+**Importante para esta versão:** o GitHub Pages publica sozinho as mudanças da interface, mas não atualiza o Google Apps Script. Até substituir `Code.gs` e publicar uma nova versão da implantação, a planilha e os e-mails continuarão usando o formato antigo de registro.
 
 ### Diagnóstico do backend
 
@@ -81,7 +84,7 @@ Os sons padrão versionados em `assets/audio/` são: `roleta-girando.mp3` durant
 4. **Testar giro** apenas anima a prévia, sem criar registros na planilha. A edição fica bloqueada durante a animação para não mudar os prêmios no meio do teste.
 5. Clique em **Publicar este layout** para torná-lo a opção inicial. Salvar na biblioteca adiciona ou atualiza o perfil no menu, mas não troca a opção inicial.
 
-Na página pública, os perfis salvos aparecem no menu lateral. O visitante pode escolher a roleta antes de girar; cada resultado é registrado na aba mensal do perfil selecionado.
+Na página pública, os perfis salvos aparecem no menu lateral. O visitante pode escolher a roleta antes de girar; o prêmio é exibido na tela, mas o registro operacional guarda somente nome e data.
 
 Durante o salvamento e a publicação, o painel bloqueia novas edições até a resposta do servidor, mantendo a biblioteca e a roleta na mesma versão dos prêmios.
 
@@ -93,9 +96,11 @@ Perfis antigos ou importados com cores iguais são corrigidos ao abrir no admin:
 
 ## Planilhas e idempotência
 
-Os giros são gravados em abas no formato `Perfil - MM-AAAA`. A primeira coluna contém o `ID do Giro`. A aba oculta `_Controle_Giros` é o índice de idempotência: repetir a mesma requisição devolve o resultado original sem criar outra linha ou enviar outro e-mail.
+Os novos giros são gravados em abas no formato `Registros - MM-AAAA`, com exatamente duas colunas: `Nome` e `Data`. A aba técnica oculta `_Controle_Giros_v2` guarda ID aleatório, prêmio, perfil e instante do giro, mas **não guarda o nome**. Ela permite devolver o mesmo resultado se uma solicitação for repetida, sem criar outra linha ou enviar outro e-mail.
 
-Abas antigas são migradas automaticamente com a inclusão da coluna `ID do Giro` na primeira utilização.
+As abas antigas não são apagadas nem modificadas automaticamente. Elas podem conter as colunas anteriores; revise sua retenção e arquivamento separadamente.
+
+No navegador, o histórico local antigo é convertido para `Nome` e `Data` na primeira abertura após a atualização; o armazenamento antigo, que continha campos extras, é removido depois da conversão.
 
 ## Privacidade e operação
 
@@ -119,7 +124,7 @@ npm test
 
 O workflow `.github/workflows/quality.yml` executa validação de sintaxe, JSON, referências locais, CSP, ausência dos fluxos inseguros antigos e testes unitários em cada push ou pull request.
 
-Para testar a interface sem Google, execute `node scripts/serve-ui-fixture.mjs` e abra `http://127.0.0.1:43119/admin/` usando a credencial fictícia `local-test-only`. Esse servidor aceita conexões somente da máquina local, usa perfis descartáveis em memória, exercita a correção de cores legadas e valida salvamento/publicação com o código real do Apps Script. O redirecionamento das chamadas acontece apenas nas respostas HTTP locais: nenhum arquivo de produção é alterado. Ele não realiza giros oficiais, não envia e-mails e não grava na planilha. Encerre com `Ctrl+C`.
+Para testar a interface sem Google, execute `node scripts/serve-ui-fixture.mjs` e abra `http://127.0.0.1:43119/admin/` usando a credencial fictícia `local-test-only`. Esse servidor aceita conexões somente da máquina local, usa perfis descartáveis em memória, exercita a correção de cores legadas e valida salvamento/publicação com o código real do Apps Script. O redirecionamento das chamadas acontece apenas nas respostas HTTP locais: nenhum arquivo de produção é alterado. Os giros simulados não são oficiais, não enviam e-mails e não gravam na planilha. Encerre com `Ctrl+C`.
 
 ## Limitações conhecidas
 

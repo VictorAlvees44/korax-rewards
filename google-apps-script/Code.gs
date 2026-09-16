@@ -6,11 +6,13 @@
  *   EMAIL_DESTINATARIO um ou mais e-mails separados por virgula
  */
 
-var CABECALHO = ["ID do Giro", "Nome", "Prêmio", "Tipo", "Data", "Hora", "Confirmação de E-mail"];
-var CABECALHO_CONTROLE = ["ID do Giro", "Nome", "Prêmio (JSON)", "Perfil", "Registrado em", "Aba", "Linha"];
+// A planilha operacional registra somente os dois dados solicitados.
+var CABECALHO = ["Nome", "Data"];
+// Controle técnico separado: não contém o nome do participante e fica oculto.
+var CABECALHO_CONTROLE = ["ID do Giro", "Prêmio (JSON)", "Perfil", "Registrado em"];
 var PASTA_PERFIS_NOME = "RoletaCorp_Perfis";
 var ARQUIVO_ATIVO_NOME = "_perfil_ativo.json";
-var ABA_CONTROLE_NOME = "_Controle_Giros";
+var ABA_CONTROLE_NOME = "_Controle_Giros_v2";
 var TAMANHO_MAX_REQUISICAO = 8 * 1024 * 1024;
 var LIMITE_GIROS_JANELA = 20;
 var SEGUNDOS_JANELA_GIROS = 300;
@@ -218,7 +220,7 @@ function sortearERegistrarGiro(corpo) {
 
   try {
     var existente = buscarGiroNoControle(idGiro);
-    if (existente) return respostaGiroExistente(existente);
+    if (existente) return respostaGiroExistente(existente, nome);
 
     aplicarLimiteDeGiros(clienteId);
     var nomePerfil = normalizarTexto(corpo.perfil || "", "perfil", 80, false);
@@ -230,26 +232,20 @@ function sortearERegistrarGiro(corpo) {
     var agora = new Date();
     var fuso = Session.getScriptTimeZone() || "America/Sao_Paulo";
     var data = Utilities.formatDate(agora, fuso, "dd/MM/yyyy");
-    var hora = Utilities.formatDate(agora, fuso, "HH:mm:ss");
-    var aba = obterAbaDoLayoutNoMes(ativo.nome, agora);
+    var aba = obterAbaRegistrosDoMes(agora);
     garantirCabecalhoAtual(aba);
-    aba.appendRow([
-      idGiro, textoSeguroPlanilha(nome), textoSeguroPlanilha(premio.nome),
-      premio.positivo ? "positivo" : "negativo", data, hora, "Pendente"
-    ]);
-    var numeroLinha = aba.getLastRow();
+    aba.appendRow([textoSeguroPlanilha(nome), data]);
     var controle = obterAbaControle();
-    controle.appendRow([idGiro, textoSeguroPlanilha(nome), JSON.stringify(premio), textoSeguroPlanilha(ativo.nome), agora, aba.getName(), numeroLinha]);
-    resultado = { idGiro: idGiro, nome: nome, premio: premio, premios: premios, perfil: ativo.nome, data: data, hora: hora, aba: aba.getName() };
+    controle.appendRow([idGiro, JSON.stringify(premio), textoSeguroPlanilha(ativo.nome), agora]);
+    resultado = { idGiro: idGiro, nome: nome, premio: premio, premios: premios, perfil: ativo.nome, data: data };
   } finally {
     lock.releaseLock();
   }
 
   try {
     enviarEmailNotificacao(resultado);
-    atualizarStatusEmail(resultado.aba, resultado.idGiro, "E-mail enviado");
   } catch (erroEmail) {
-    atualizarStatusEmail(resultado.aba, resultado.idGiro, "Falha no e-mail: " + String(erroEmail.message || erroEmail).substring(0, 160));
+    console.warn("Falha no e-mail administrativo: " + String(erroEmail.message || erroEmail).substring(0, 160));
   }
   return { status: "sucesso", dados: resultado };
 }
@@ -299,46 +295,31 @@ function buscarGiroNoControle(idGiro) {
   if (!celula) return null;
   var valores = aba.getRange(celula.getRow(), 1, 1, CABECALHO_CONTROLE.length).getValues()[0];
   return {
-    idGiro: valores[0], nome: removerPrefixoPlanilha(valores[1]), premio: JSON.parse(valores[2]),
-    perfil: removerPrefixoPlanilha(valores[3]), registradoEm: valores[4], aba: valores[5], linha: valores[6]
+    idGiro: valores[0], premio: JSON.parse(valores[1]),
+    perfil: removerPrefixoPlanilha(valores[2]), registradoEm: valores[3]
   };
 }
 
-function respostaGiroExistente(existente) {
+function respostaGiroExistente(existente, nomeParticipante) {
   var dataRegistro = existente.registradoEm instanceof Date ? existente.registradoEm : new Date(existente.registradoEm);
   var fuso = Session.getScriptTimeZone() || "America/Sao_Paulo";
   var ativo = obterConfigAtivo();
   return {
     status: "sucesso", duplicado: true,
     dados: {
-      idGiro: existente.idGiro, nome: existente.nome, premio: existente.premio,
+      idGiro: existente.idGiro, nome: nomeParticipante, premio: existente.premio,
       premios: ativo && ativo.nome === existente.perfil ? ativo.config.premios : [existente.premio],
       perfil: existente.perfil,
-      data: Utilities.formatDate(dataRegistro, fuso, "dd/MM/yyyy"),
-      hora: Utilities.formatDate(dataRegistro, fuso, "HH:mm:ss"), aba: existente.aba
+      data: Utilities.formatDate(dataRegistro, fuso, "dd/MM/yyyy")
     }
   };
 }
 
-function atualizarStatusEmail(nomeAba, idGiro, status) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    var aba = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(nomeAba);
-    if (!aba || aba.getLastRow() < 2) return;
-    var celula = aba.getRange(2, 1, aba.getLastRow() - 1, 1).createTextFinder(idGiro).matchEntireCell(true).findNext();
-    if (celula) aba.getRange(celula.getRow(), CABECALHO.length).setValue(status);
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function obterAbaDoLayoutNoMes(nomeLayout, agora) {
+function obterAbaRegistrosDoMes(agora) {
   var arquivo = SpreadsheetApp.getActiveSpreadsheet();
   var fuso = Session.getScriptTimeZone() || "America/Sao_Paulo";
   var mesAno = Utilities.formatDate(agora, fuso, "MM-yyyy");
-  var seguro = String(nomeLayout).replace(/[:\\/?*\[\]]/g, "_").trim().substring(0, 85) || "Padrão";
-  var nomeAba = seguro + " - " + mesAno;
+  var nomeAba = "Registros - " + mesAno;
   var aba = arquivo.getSheetByName(nomeAba);
   if (!aba) {
     aba = arquivo.insertSheet(nomeAba);
@@ -352,22 +333,21 @@ function obterAbaDoLayoutNoMes(nomeLayout, agora) {
 function garantirCabecalhoAtual(aba) {
   if (aba.getLastRow() === 0) {
     aba.appendRow(CABECALHO);
-  } else if (aba.getRange(1, 1).getValue() !== CABECALHO[0]) {
-    aba.insertColumnBefore(1);
-    aba.getRange(1, 1).setValue(CABECALHO[0]);
-    aba.getRange(1, 1, 1, CABECALHO.length).setFontWeight("bold");
+  } else {
+    var atual = aba.getRange(1, 1, 1, CABECALHO.length).getValues()[0];
+    if (atual[0] !== CABECALHO[0] || atual[1] !== CABECALHO[1]) {
+      throw new Error("A aba de registros possui um cabeçalho incompatível.");
+    }
   }
 }
 
 function enviarEmailNotificacao(dados) {
   var destinatario = PropertiesService.getScriptProperties().getProperty("EMAIL_DESTINATARIO");
   if (!destinatario) throw new Error("EMAIL_DESTINATARIO não configurado.");
-  var assunto = "Novo resultado da Roleta — " + dados.perfil;
+  var assunto = "Novo registro da Roleta Korax";
   var corpo =
     "Um novo giro foi registrado:\n\n" +
-    "ID: " + dados.idGiro + "\nLayout: " + dados.perfil + "\nNome: " + dados.nome +
-    "\nPrêmio: " + dados.premio.nome + "\nTipo: " + (dados.premio.positivo ? "positivo" : "negativo") +
-    "\nData: " + dados.data + "\nHora: " + dados.hora + "\n";
+    "Nome: " + dados.nome + "\nData: " + dados.data + "\n";
   MailApp.sendEmail(destinatario, assunto, corpo);
 }
 

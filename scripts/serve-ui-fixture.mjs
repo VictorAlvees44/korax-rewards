@@ -75,8 +75,7 @@ const servidor = createServer(async (req, res) => {
             perfil: nomePerfil,
             premio,
             premios: configPerfil.premios,
-            data: "14/09/2026",
-            hora: "10:00:00"
+            data: "15/09/2026"
           }
         });
         return;

@@ -11,7 +11,7 @@ import {
   sortearGiroRemoto, gerarIdSeguro, girarRoleta, validarConfiguracao,
   adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela
-} from "./core.js?v=20260914-performance";
+} from "./core.js?v=20260916-admin";
 
 let trocandoPerfil = false;
 
@@ -178,15 +178,7 @@ function finalizarGiro(registroRemoto) {
   pararSom("audioGiro");
   tocarSom("audioParada");
 
-  const registro = {
-    idGiro: registroRemoto.idGiro,
-    nome: nomeParticipante,
-    premio: premio.nome,
-    tipo: premio.positivo ? "positivo" : "negativo",
-    perfil: registroRemoto.perfil,
-    data: registroRemoto.data,
-    hora: registroRemoto.hora
-  };
+  const registro = { nome: nomeParticipante, data: registroRemoto.data };
 
   adicionarHistorico(registro);
 
