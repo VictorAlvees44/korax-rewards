@@ -11,10 +11,9 @@ import {
   buscarConfigAtivoRemoto, listarPerfisRemoto, salvarPerfilRemoto,
   ativarPerfilRemoto, excluirPerfilRemoto,
   autenticarAdminRemoto, configurarCredencialAdmin, validarConfiguracao,
-  gerarId, gerarCorAleatoria, corrigirCoresRepetidas, mostrarToast, carregarHistorico,
-  aplicarVisualNaTela, carregarSonsNosElementos, sortearPremioAleatorio,
-  girarRoleta, obterUrlBackend
-} from "../core.js?v=20260916-admin";
+  gerarId, gerarCorAleatoria, corrigirCoresRepetidas, mostrarToast,
+  obterUrlBackend
+} from "../core.js?v=20261021-tela";
 
 let Perfis = {}; // cache local em memória do que veio do backend: { nome: config }
 let painelOcupado = false;
@@ -23,7 +22,6 @@ let carregandoPerfis = null;
 let painelConfigurado = false;
 let painelPronto = false;
 const CHAVE_SESSAO_ADMIN = "roletaCorp_admin_secret_v1";
-const TAMANHO_MAX_UPLOAD = 2 * 1024 * 1024;
 
 /* ========================================================================
    CONFIGURAÇÃO DE PARTIDA (SEM BACKEND / MODO OFFLINE)
@@ -47,7 +45,6 @@ function configurarAbas() {
       document.querySelectorAll(".painel__conteudo").forEach((secao) => {
         secao.classList.toggle("oculto", secao.dataset.conteudo !== alvo);
       });
-      if (alvo === "historico" || alvo === "estatisticas") HistoricoEstatisticas.atualizar();
       if (alvo === "perfis") carregarBibliotecaPerfis().catch((erro) => mostrarToast("Não foi possível carregar os perfis: " + erro.message));
     });
   });
@@ -74,7 +71,7 @@ function configurarPremios() {
 function marcarEdicaoPremios() {
   Estado._ehPerfilPublicadoAgora = false;
   atualizarRotuloPerfilAtual();
-  document.getElementById("statusEdicaoPremios").textContent = "Alterações ainda não publicadas. Clique em Publicar este layout para aplicá-las na roleta.";
+  document.getElementById("statusEdicaoPremios").textContent = "Alterações ainda não salvas. Clique em Salvar alterações deste perfil.";
 }
 
 function atualizarResumoPremios() {
@@ -174,85 +171,6 @@ function renderizarListaPremios() {
 }
 
 /* ========================================================================
-   VISUAL
-   ======================================================================== */
-
-function configurarVisual() {
-  document.getElementById("inputNomeEmpresa").addEventListener("input", (e) => {
-    Estado.config.empresa.nome = e.target.value;
-  });
-  document.getElementById("inputTituloRoleta").addEventListener("input", (e) => {
-    Estado.config.empresa.tituloRoleta = e.target.value;
-  });
-  document.getElementById("inputCorPrimaria").addEventListener("input", (e) => {
-    Estado.config.empresa.corPrimaria = e.target.value;
-    aplicarVisualNaTela(Estado.config);
-  });
-  document.getElementById("inputCorSecundaria").addEventListener("input", (e) => {
-    Estado.config.empresa.corSecundaria = e.target.value;
-    aplicarVisualNaTela(Estado.config);
-  });
-  document.getElementById("selectFonte").addEventListener("change", (e) => {
-    Estado.config.empresa.fonte = e.target.value;
-    aplicarVisualNaTela(Estado.config);
-  });
-  configurarUploadImagem("inputLogoUpload", (dataUrl) => {
-    Estado.config.empresa.logoUrl = dataUrl;
-    aplicarVisualNaTela(Estado.config);
-  });
-  configurarUploadImagem("inputFundoUpload", (dataUrl) => {
-    Estado.config.empresa.planoFundoUrl = dataUrl;
-    aplicarVisualNaTela(Estado.config);
-  });
-}
-
-function configurarUploadImagem(idInput, aoCarregar) {
-  document.getElementById(idInput).addEventListener("change", (e) => {
-    const arquivo = e.target.files[0];
-    if (!arquivo) return;
-    if (!/^image\/(png|jpeg|webp|gif)$/.test(arquivo.type) || arquivo.size > TAMANHO_MAX_UPLOAD) {
-      mostrarToast("Use PNG, JPEG, WebP ou GIF com no máximo 2 MB.");
-      e.target.value = "";
-      return;
-    }
-    const leitor = new FileReader();
-    leitor.onload = () => aoCarregar(leitor.result);
-    leitor.readAsDataURL(arquivo);
-  });
-}
-
-/* ========================================================================
-   SONS
-   ======================================================================== */
-
-function configurarSons() {
-  const mapa = {
-    uploadSomGiro: { chave: "giro", audio: "audioGiro" },
-    uploadSomVitoria: { chave: "vitoria", audio: "audioVitoria" },
-    uploadSomDerrota: { chave: "derrota", audio: "audioDerrota" },
-    uploadSomClique: { chave: "clique", audio: "audioClique" },
-    uploadSomParada: { chave: "parada", audio: "audioParada" }
-  };
-  Object.entries(mapa).forEach(([idInput, info]) => {
-    document.getElementById(idInput).addEventListener("change", (e) => {
-      const arquivo = e.target.files[0];
-      if (!arquivo) return;
-      if (!/^audio\/(mpeg|mp3|wav|ogg|webm|mp4|x-m4a)$/.test(arquivo.type) || arquivo.size > TAMANHO_MAX_UPLOAD) {
-        mostrarToast("Use MP3, WAV, OGG, WebM ou M4A com no máximo 2 MB.");
-        e.target.value = "";
-        return;
-      }
-      const leitor = new FileReader();
-      leitor.onload = () => {
-        Estado.config.sons[info.chave] = leitor.result;
-        document.getElementById(info.audio).src = leitor.result;
-      };
-      leitor.readAsDataURL(arquivo);
-    });
-  });
-}
-
-/* ========================================================================
    PERFIS — biblioteca central (backend) + ativação
    ======================================================================== */
 
@@ -269,7 +187,7 @@ function configurarPerfis() {
     const campoNome = document.getElementById("inputNomeNovoPerfil");
     const nome = campoNome.value.trim() || Estado.nomePerfilAtivo;
     if (!nome) { mostrarToast("Digite um nome para o perfil."); return; }
-    if (!obterUrlBackend()) { mostrarToast("Configure a URL do backend na aba Configurações antes de salvar."); return; }
+    if (!obterUrlBackend()) { mostrarToast("O endereço do backend ainda não foi configurado no site."); return; }
 
     try { await carregarBibliotecaPerfis(); }
     catch (erro) { mostrarToast("Não foi possível conferir os perfis existentes: " + erro.message); return; }
@@ -286,7 +204,7 @@ function configurarPerfis() {
       campoNome.value = "";
       atualizarRotuloPerfilAtual();
       renderizarListaPerfis();
-      document.getElementById("statusEdicaoPremios").textContent = "Perfil salvo na biblioteca. Publique o layout para atualizar a roleta pública.";
+      document.getElementById("statusEdicaoPremios").textContent = "Perfil criado e disponível na entrada da roleta.";
       mostrarToast(`Perfil "${nome}" salvo na biblioteca.`);
     } catch (erro) {
       mostrarToast("Não foi possível salvar: " + erro.message);
@@ -297,11 +215,11 @@ function configurarPerfis() {
 
   document.getElementById("btnAtivarPerfil").addEventListener("click", async () => {
     if (painelOcupado) return;
-    if (!obterUrlBackend()) { mostrarToast("Configure a URL do backend na aba Configurações antes de publicar."); return; }
+    if (!obterUrlBackend()) { mostrarToast("O endereço do backend ainda não foi configurado no site."); return; }
     let nome = Estado.nomePerfilAtivo;
     if (!nome) {
       nome = (document.getElementById("inputNomeNovoPerfil").value || "").trim();
-      if (!nome) { mostrarToast("Dê um nome ao perfil (aba Perfis) antes de publicar."); return; }
+      if (!nome) { mostrarToast("Dê um nome ao perfil na aba Perfis antes de salvar."); return; }
     }
     const configPublicada = structuredClone(Estado.config);
     const liberar = bloquearEdicaoPainel();
@@ -313,36 +231,15 @@ function configurarPerfis() {
       Estado._ehPerfilPublicadoAgora = true;
       atualizarRotuloPerfilAtual();
       renderizarListaPerfis();
-      document.getElementById("statusEdicaoPremios").textContent = "Perfil publicado. Os próximos giros usarão estes prêmios.";
-      mostrarToast(`"${nome}" agora está ativo na roleta pública!`);
+      document.getElementById("statusEdicaoPremios").textContent = "Alterações salvas. Este perfil já está disponível na entrada da roleta.";
+      mostrarToast(`Alterações do perfil "${nome}" salvas.`);
     } catch (erro) {
-      mostrarToast("Não foi possível publicar: " + erro.message);
+      mostrarToast("Não foi possível salvar: " + erro.message);
     } finally {
       liberar();
     }
   });
 
-  document.getElementById("btnTestarGiro").addEventListener("click", () => {
-    if (painelOcupado || Estado.girando || Estado.config.premios.length < 2) return;
-    try { validarConfiguracao(Estado.config); }
-    catch (erro) { mostrarToast("Revise os prêmios: " + erro.message); return; }
-    Estado.girando = true;
-    const liberarEdicao = bloquearEdicaoPainel();
-    const liberar = () => {
-      Estado.girando = false;
-      liberarEdicao();
-    };
-    try {
-      const premioEscolhido = sortearPremioAleatorio(Estado.config.premios);
-      girarRoleta(premioEscolhido, 2600, () => {
-        liberar();
-        mostrarToast(`Teste: saiu "${premioEscolhido.nome}" (nada foi registrado).`);
-      });
-    } catch (erro) {
-      liberar();
-      mostrarToast("Não foi possível testar: " + erro.message);
-    }
-  });
 }
 
 async function carregarPerfilNaTela(nome, ativarNoTopo) {
@@ -432,90 +329,6 @@ async function carregarBibliotecaPerfis() {
 }
 
 /* ========================================================================
-   CONFIGURAÇÕES GERAIS
-   ======================================================================== */
-
-function configurarConfiguracoesGerais() {
-  document.getElementById("inputUrlWebhook").addEventListener("change", (e) => {
-    window.CONFIG_PADRAO.webhook.url = e.target.value.trim();
-    if (!obterUrlBackend()) {
-      mostrarToast("Use uma URL HTTPS válida de implantação do Google Apps Script terminada em /exec.");
-      e.target.value = "";
-      return;
-    }
-    e.target.value = obterUrlBackend();
-    mostrarToast("URL aplicada nesta aba para teste. Edite config.js para valer para todos.");
-  });
-  document.getElementById("inputDuracaoGiro").addEventListener("input", (e) => {
-    Estado.config.roleta.duracaoGiroMs = Math.round(Number(e.target.value) * 1000);
-  });
-  document.getElementById("inputVoltasMinimas").addEventListener("input", (e) => {
-    Estado.config.roleta.voltasMinimas = Number(e.target.value);
-  });
-
-  document.getElementById("btnExportarJson").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(Estado.config, null, 2)], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `perfil-${Estado.nomePerfilAtivo || "sem-nome"}.json`;
-    link.click();
-  });
-
-  document.getElementById("inputImportarJson").addEventListener("change", (e) => {
-    const arquivo = e.target.files[0];
-    if (!arquivo) return;
-    const leitor = new FileReader();
-    leitor.onload = () => {
-      try {
-        const importada = JSON.parse(leitor.result);
-        validarConfiguracao(importada, { permitirCoresRepetidas: true });
-        Estado.config = importada;
-        Estado.nomePerfilAtivo = "";
-        Estado._ehPerfilPublicadoAgora = false;
-        preencherCampos();
-        atualizarRotuloPerfilAtual();
-        Roleta.desenhar(Estado.anguloAtual);
-        mostrarToast("Configuração importada — dê um nome e salve para adicionar à biblioteca.");
-      } catch (erro) {
-        mostrarToast("Configuração inválida: " + erro.message);
-      }
-    };
-    leitor.readAsText(arquivo);
-  });
-}
-
-/* ========================================================================
-   HISTÓRICO E ESTATÍSTICAS (espelho local deste navegador)
-   ======================================================================== */
-
-const HistoricoEstatisticas = {
-  atualizar() {
-    const historico = carregarHistorico();
-    this._renderizarTabela(historico.slice(0, 20));
-    this._renderizarEstatisticas(historico);
-  },
-
-  _renderizarTabela(linhas) {
-    const corpo = document.getElementById("corpoHistorico");
-    corpo.replaceChildren();
-    linhas.forEach((registro) => {
-      const tr = document.createElement("tr");
-      const celula = (texto) => { const td = document.createElement("td"); td.textContent = texto; return td; };
-      tr.appendChild(celula(registro.nome));
-      tr.appendChild(celula(registro.data));
-      corpo.appendChild(tr);
-    });
-  },
-
-  _renderizarEstatisticas(historico) {
-    document.getElementById("estatTotalGiros").textContent = historico.length;
-    const participantes = new Set(historico.map((registro) => registro.nome.trim().toLocaleLowerCase("pt-BR")));
-    document.getElementById("estatParticipantes").textContent = participantes.size;
-    document.getElementById("estatUltimaData").textContent = historico[0]?.data || "-";
-  }
-};
-
-/* ========================================================================
    PREENCHIMENTO DE CAMPOS / INICIALIZAÇÃO
    ======================================================================== */
 
@@ -525,20 +338,11 @@ function preencherCampos() {
   const coresCorrigidas = corrigirCoresRepetidas(c.premios);
   if (coresCorrigidas) {
     marcarEdicaoPremios();
-    document.getElementById("statusEdicaoPremios").textContent = `${coresCorrigidas} cor(es) repetida(s) receberam novas cores aleatórias. Publique para aplicar na roleta.`;
+    document.getElementById("statusEdicaoPremios").textContent = `${coresCorrigidas} cor(es) repetida(s) receberam novas cores aleatórias. Salve para aplicar.`;
   } else {
-    document.getElementById("statusEdicaoPremios").textContent = "Edite os prêmios e publique o layout para aplicar as alterações na roleta pública.";
+    document.getElementById("statusEdicaoPremios").textContent = "Edite os prêmios e salve as alterações deste perfil.";
   }
-  document.getElementById("inputNomeEmpresa").value = c.empresa.nome;
-  document.getElementById("inputTituloRoleta").value = c.empresa.tituloRoleta || "Roleta da Sorte";
-  document.getElementById("inputCorPrimaria").value = c.empresa.corPrimaria;
-  document.getElementById("inputCorSecundaria").value = c.empresa.corSecundaria;
-  document.getElementById("selectFonte").value = c.empresa.fonte;
-  document.getElementById("inputUrlWebhook").value = obterUrlBackend();
-  document.getElementById("inputDuracaoGiro").value = (c.roleta.duracaoGiroMs / 1000).toFixed(1);
-  document.getElementById("inputVoltasMinimas").value = c.roleta.voltasMinimas;
   renderizarListaPremios();
-  carregarSonsNosElementos(c);
 }
 
 async function iniciarPainel(promessaAtivo) {
@@ -546,15 +350,12 @@ async function iniciarPainel(promessaAtivo) {
   if (!painelConfigurado) {
     configurarAbas();
     configurarPremios();
-    configurarVisual();
-    configurarSons();
     configurarPerfis();
-    configurarConfiguracoesGerais();
     painelConfigurado = true;
   }
 
   // Não abrir um perfil de fábrica para edição se a leitura remota falhar:
-  // isso poderia fazer alguém publicar por engano sobre a campanha ativa.
+  // isso poderia fazer alguém salvar por engano sobre a campanha ativa.
   const leituraAtivo = await promessaAtivo;
   if (leituraAtivo.erro) throw leituraAtivo.erro;
   const ativo = leituraAtivo.ativo;
@@ -578,7 +379,6 @@ async function iniciarPainel(promessaAtivo) {
   preencherCampos();
   atualizarRotuloPerfilAtual();
   Roleta.iniciar("canvasRoleta");
-  HistoricoEstatisticas.atualizar();
   painelPronto = true;
 }
 

@@ -17,6 +17,13 @@
 export const CHAVE_CACHE_CONFIG_ATIVO = "roletaCorp_cache_config_ativo_v2";
 export const CHAVE_HISTORICO = "roletaCorp_historico_minimo_v3";
 export const CHAVE_CLIENTE = "roletaCorp_cliente_v3";
+export const SONS_FIXOS = Object.freeze({
+  giro: "assets/audio/roleta-girando.mp3",
+  vitoria: "assets/audio/palmas.mp3",
+  derrota: "assets/audio/naruto-sad.mp3",
+  clique: "",
+  parada: ""
+});
 
 let segredoAdmin = "";
 
@@ -39,7 +46,8 @@ export function obterUrlBackend() {
   const valor = (window.CONFIG_PADRAO && window.CONFIG_PADRAO.webhook && window.CONFIG_PADRAO.webhook.url) || "";
   try {
     const url = new URL(valor);
-    if (url.protocol !== "https:" || url.hostname !== "script.google.com" || !/^\/macros\/s\/[^/]+\/exec$/.test(url.pathname)) return "";
+    const caminhoValido = /^\/(?:macros|a\/macros\/[^/]+)\/s\/[^/]+\/exec$/.test(url.pathname);
+    if (url.protocol !== "https:" || url.hostname !== "script.google.com" || !caminhoValido) return "";
     return url.toString();
   } catch (erro) {
     return "";
@@ -113,6 +121,12 @@ export async function listarPerfisPublicosRemoto() {
 /** Busca um perfil escolhido no menu. O servidor continua sendo a fonte da verdade. */
 export async function buscarPerfilPublicoRemoto(nome) {
   const dados = await chamarBackendGet("perfilPublico", { nome: String(nome || "") });
+  return dados.dados || null;
+}
+
+/** Último evento público do perfil, usado apenas pelo modo tela. */
+export async function buscarUltimoGiroRemoto(nome) {
+  const dados = await chamarBackendGet("ultimoGiro", { perfil: String(nome || "") });
   return dados.dados || null;
 }
 
@@ -402,7 +416,9 @@ export function atualizarLogoCentral(logoUrl) {
 }
 
 export function carregarSonsNosElementos(config) {
-  const s = config.sons;
+  // Os áudios são parte fixa do produto. Perfis antigos não podem substituí-los.
+  const s = SONS_FIXOS;
+  if (config && typeof config === "object") config.sons = { ...SONS_FIXOS };
   const mapa = { giro: "audioGiro", vitoria: "audioVitoria", derrota: "audioDerrota", clique: "audioClique", parada: "audioParada" };
   Object.entries(mapa).forEach(([chave, idAudio]) => {
     const el = document.getElementById(idAudio);

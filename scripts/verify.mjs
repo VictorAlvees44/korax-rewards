@@ -44,7 +44,10 @@ if (botoesGirar.length !== 1 || !/<button[^>]+id="btnGirar"[^>]*>[\s\S]*?GIRAR[\
 if (!paginaPublica.includes('id="listaPerfisPublicos"') || !paginaPublica.includes('id="nomePerfilSelecionado"')) {
   throw new Error("A página pública deve manter o menu lateral de perfis.");
 }
-if (!/acao === "perfisPublicos"/.test(gas) || !/acao === "perfilPublico"/.test(gas)) {
+if (!paginaPublica.includes('id="modalPerfil"') || !paginaPublica.includes('id="listaPerfisEntrada"')) {
+  throw new Error("A página pública deve pedir a escolha do perfil na entrada.");
+}
+if (!/acao === "perfisPublicos"/.test(gas) || !/acao === "perfilPublico"/.test(gas) || !/acao === "ultimoGiro"/.test(gas)) {
   throw new Error("O backend deve expor os perfis usados pelo menu público.");
 }
 if (!/var CABECALHO = \["Nome", "Data"\]/.test(gas)) {
@@ -61,6 +64,19 @@ if (/registrarGiro|FILA_PENDENTE|tentarReenviarPendentes/.test(codigoCliente)) {
 
 const fluxoPublico = readFileSync(resolve(raiz, "roleta-app.js"), "utf8");
 const nucleo = readFileSync(resolve(raiz, "core.js"), "utf8");
+const painelAdmin = readFileSync(resolve(raiz, "admin/index.html"), "utf8");
+if ((painelAdmin.match(/class="aba/g) || []).length !== 2 || /data-aba="(?:visual|sons|config|historico|estatisticas)"/.test(painelAdmin)) {
+  throw new Error("O painel deve manter somente as abas Prêmios e Perfis.");
+}
+if (/uploadSom|inputLogoUpload|inputFundoUpload/.test(painelAdmin)) {
+  throw new Error("Sons e identidade visual não devem ser editáveis no painel simplificado.");
+}
+if (!/MODO_TELA[\s\S]*buscarUltimoGiroRemoto/.test(fluxoPublico)) {
+  throw new Error("A página pública deve oferecer sincronização para a tela corporativa.");
+}
+if (!/var SONS_FIXOS = \{[\s\S]*roleta-girando\.mp3[\s\S]*palmas\.mp3[\s\S]*naruto-sad\.mp3/.test(gas)) {
+  throw new Error("O backend deve fixar os três áudios oficiais.");
+}
 for (const [teste, mensagem] of [
   [/tocarSom\("audioGiro"\)/, "O giro não inicia seu áudio."],
   [/pararSom\("audioGiro"\)/, "O giro não interrompe seu áudio ao terminar."],

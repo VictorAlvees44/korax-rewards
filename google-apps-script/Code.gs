@@ -16,6 +16,14 @@ var ABA_CONTROLE_NOME = "_Controle_Giros_v2";
 var TAMANHO_MAX_REQUISICAO = 8 * 1024 * 1024;
 var LIMITE_GIROS_JANELA = 20;
 var SEGUNDOS_JANELA_GIROS = 300;
+var SEGUNDOS_EVENTO_TELA = 600;
+var SONS_FIXOS = {
+  giro: "assets/audio/roleta-girando.mp3",
+  vitoria: "assets/audio/palmas.mp3",
+  derrota: "assets/audio/naruto-sad.mp3",
+  clique: "",
+  parada: ""
+};
 
 function doGet(e) {
   try {
@@ -23,6 +31,7 @@ function doGet(e) {
     if (acao === "configAtivo") return respostaJson({ status: "sucesso", dados: obterConfigAtivo() });
     if (acao === "perfisPublicos") return respostaJson(listarPerfisPublicos());
     if (acao === "perfilPublico") return respostaJson({ status: "sucesso", dados: obterPerfilPublico(e.parameter.nome) });
+    if (acao === "ultimoGiro") return respostaJson({ status: "sucesso", dados: obterUltimoGiro(e.parameter.perfil) });
     if (acao === "saude") {
       var props = PropertiesService.getScriptProperties();
       return respostaJson({
@@ -220,7 +229,11 @@ function sortearERegistrarGiro(corpo) {
 
   try {
     var existente = buscarGiroNoControle(idGiro);
-    if (existente) return respostaGiroExistente(existente, nome);
+    if (existente) {
+      var repetido = respostaGiroExistente(existente, nome);
+      tentarPublicarEventoGiro(repetido.dados);
+      return repetido;
+    }
 
     aplicarLimiteDeGiros(clienteId);
     var nomePerfil = normalizarTexto(corpo.perfil || "", "perfil", 80, false);
@@ -242,12 +255,51 @@ function sortearERegistrarGiro(corpo) {
     lock.releaseLock();
   }
 
+  tentarPublicarEventoGiro(resultado);
   try {
     enviarEmailNotificacao(resultado);
   } catch (erroEmail) {
     console.warn("Falha no e-mail administrativo: " + String(erroEmail.message || erroEmail).substring(0, 160));
   }
   return { status: "sucesso", dados: resultado };
+}
+
+/**
+ * Publica somente os dados necessários para a tela remota acompanhar o giro.
+ * O nome do participante nunca entra nesse canal público.
+ */
+function tentarPublicarEventoGiro(resultado) {
+  try {
+    var evento = {
+      idGiro: resultado.idGiro,
+      perfil: resultado.perfil,
+      premio: resultado.premio,
+      premios: resultado.premios,
+      criadoEm: new Date().toISOString()
+    };
+    CacheService.getScriptCache().put(chaveEventoPerfil(resultado.perfil), JSON.stringify(evento), SEGUNDOS_EVENTO_TELA);
+  } catch (erro) {
+    console.warn("Falha ao transmitir o giro para a tela: " + String(erro.message || erro).substring(0, 160));
+  }
+}
+
+function obterUltimoGiro(nomePerfil) {
+  var nome = validarNomePerfil(nomePerfil);
+  var texto = CacheService.getScriptCache().get(chaveEventoPerfil(nome));
+  if (!texto) return null;
+  try {
+    var evento = JSON.parse(texto);
+    if (!evento || evento.perfil !== nome || !evento.idGiro || !evento.premio) return null;
+    return evento;
+  } catch (ignorado) {
+    return null;
+  }
+}
+
+function chaveEventoPerfil(nomePerfil) {
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(nomePerfil), Utilities.Charset.UTF_8);
+  var sufixo = digest.slice(0, 12).map(function (byte) { return (byte + 256).toString(16).slice(-2); }).join("");
+  return "tela_" + sufixo;
 }
 
 function aplicarLimiteDeGiros(clienteId) {
@@ -357,7 +409,6 @@ function validarENormalizarConfig(config, permitirCoresLegadas) {
   if (!config || Object.prototype.toString.call(config) !== "[object Object]") throw new Error("Configuração inválida.");
   if (JSON.stringify(config).length > TAMANHO_MAX_REQUISICAO) throw new Error("Perfil excede o limite de 8 MB.");
   var empresa = config.empresa || {};
-  var sons = config.sons || {};
   var roleta = config.roleta || {};
   var premios = config.premios;
   if (!Array.isArray(premios) || premios.length < 2 || premios.length > 50) throw new Error("O perfil deve conter entre 2 e 50 prêmios.");
@@ -401,11 +452,7 @@ function validarENormalizarConfig(config, permitirCoresLegadas) {
       corSecundaria: validarCor(empresa.corSecundaria),
       fonte: fonte
     },
-    sons: {
-      giro: validarUrlMidia(sons.giro || "", "audio"), vitoria: validarUrlMidia(sons.vitoria || "", "audio"),
-      derrota: validarUrlMidia(sons.derrota || "", "audio"), clique: validarUrlMidia(sons.clique || "", "audio"),
-      parada: validarUrlMidia(sons.parada || "", "audio")
-    },
+    sons: SONS_FIXOS,
     roleta: { duracaoGiroMs: Math.round(duracao), voltasMinimas: voltas },
     webhook: { url: "" },
     premios: premiosNormalizados

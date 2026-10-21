@@ -402,6 +402,69 @@ select option:disabled { color: #8f98aa; }
 }
 .modal__caixa p { color: var(--cor-texto-suave); margin: 0 0 18px; }
 
+.modal__caixa--perfil { width: min(620px, 100%); }
+.modal-perfil__marca {
+  margin-bottom: 8px !important;
+  color: var(--cor-primaria-clara) !important;
+  font-family: var(--fonte-display);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+.lista-perfis-entrada {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+.perfil-entrada__botao {
+  display: flex;
+  min-height: 96px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid var(--cor-borda);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  color: var(--cor-texto);
+  text-align: left;
+  transition: var(--transicao);
+}
+.perfil-entrada__botao:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--cor-primaria-clara);
+  background: rgba(201,162,39,0.14);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+}
+.perfil-entrada__botao strong { font-family: var(--fonte-display); font-size: 1.1rem; color: var(--cor-primaria-clara); }
+.perfil-entrada__botao span, .lista-perfis-entrada__status { color: var(--cor-texto-suave); font-size: 0.82rem; }
+.lista-perfis-entrada__status { grid-column: 1 / -1; padding: 18px; }
+
+.status-tela {
+  margin: -2px 0 10px;
+  color: #ffcf9f;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.status-tela--conectado { color: #79d7ad; }
+
+body.modo-tela { overflow: hidden; }
+.modo-tela .palco { overflow: hidden; }
+.modo-tela .experiencia-roleta {
+  width: min(1120px, 100%);
+  grid-template-columns: minmax(0, 1fr);
+  padding-inline: 24px;
+}
+.modo-tela .menu-perfis,
+.modo-tela .perfil-selecionado,
+.modo-tela #btnTelaCheia { display: none; }
+.modo-tela .arena__roleta-wrap { width: min(78vh, 88vw, 760px); }
+.modo-tela .cubo-central:disabled { opacity: 1; cursor: default; font-size: clamp(0.48rem, 1.05vw, 0.82rem); }
+.modo-tela #btnFecharResultado { display: none; }
+
 .rotulo { display: block; text-align: left; font-size: 0.85rem; margin-bottom: 6px; color: var(--cor-texto-suave); }
 
 .campo {
@@ -773,6 +836,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   .cartao-premio__cor { grid-row: 1 / span 2; }
   .cartao-premio select { grid-column: 2; }
   .cartao-premio .botao-remover { grid-column: 1 / -1; }
+  .modal__caixa--perfil { padding: 26px 20px; }
+  .lista-perfis-entrada { grid-template-columns: 1fr; }
 }
 
 @media (min-width: 1000px) and (min-height: 700px) {

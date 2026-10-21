@@ -1,19 +1,26 @@
 /**
- * roleta-app.js
- * Bootstrap da tela pública da roleta (index.html).
- * Busca o perfil ativo do backend a cada carregamento — é por isso que
- * qualquer navegador/dispositivo mostra o mesmo layout, sem depender de
- * localStorage local.
+ * Tela pública da roleta.
+ *
+ * Modo normal: escolhe um perfil, pede o nome e inicia o giro.
+ * Modo tela: use ?modo=tela&perfil=Comercial no player da Corporate Screen;
+ * a página acompanha os giros iniciados em outro computador.
  */
 import {
   Estado, Roleta, Confete,
   obterConfigParaExibir, listarPerfisPublicosRemoto, buscarPerfilPublicoRemoto,
-  sortearGiroRemoto, gerarIdSeguro, girarRoleta, validarConfiguracao,
-  adicionarHistorico, mostrarToast,
+  buscarUltimoGiroRemoto, sortearGiroRemoto, gerarIdSeguro, girarRoleta,
+  validarConfiguracao, adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela
-} from "./core.js?v=20260916-admin";
+} from "./core.js?v=20261021-tela";
+
+const parametros = new URLSearchParams(location.search);
+const MODO_TELA = parametros.get("modo") === "tela";
+const PERFIL_DA_URL = String(parametros.get("perfil") || "").trim();
+const INICIO_DA_ESCUTA = Date.now();
 
 let trocandoPerfil = false;
+let timerSincronizacao = 0;
+let ultimoEventoId = "";
 
 function atualizarResumoPerfil() {
   const nome = Estado.nomePerfilAtivo || "Roleta principal";
@@ -33,10 +40,14 @@ function marcarPerfilSelecionado() {
   atualizarResumoPerfil();
 }
 
-async function selecionarPerfil(nome) {
-  if (Estado.girando || trocandoPerfil || nome === Estado.nomePerfilAtivo) return;
+async function selecionarPerfil(nome, { silencioso = false } = {}) {
+  if (!nome || Estado.girando || trocandoPerfil) return false;
+  if (nome === Estado.nomePerfilAtivo) {
+    marcarPerfilSelecionado();
+    return true;
+  }
   trocandoPerfil = true;
-  const botoes = Array.from(document.querySelectorAll(".menu-perfis__botao"));
+  const botoes = Array.from(document.querySelectorAll(".menu-perfis__botao, .perfil-entrada__botao"));
   botoes.forEach((botao) => { botao.disabled = true; });
   try {
     const perfil = await buscarPerfilPublicoRemoto(nome);
@@ -49,20 +60,25 @@ async function selecionarPerfil(nome) {
     carregarSonsNosElementos(Estado.config);
     Roleta.desenhar(Estado.anguloAtual);
     marcarPerfilSelecionado();
-    mostrarToast(`Roleta "${perfil.nome}" selecionada.`);
+    if (!silencioso) mostrarToast(`Roleta "${perfil.nome}" selecionada.`);
+    return true;
   } catch (erro) {
-    mostrarToast("Não foi possível carregar o perfil: " + erro.message);
+    if (!silencioso) mostrarToast("Não foi possível carregar o perfil: " + erro.message);
+    return false;
   } finally {
     trocandoPerfil = false;
     botoes.forEach((botao) => { botao.disabled = false; });
   }
 }
 
+function nomesUnicos(nomes) {
+  return [...new Set([Estado.nomePerfilAtivo, ...(nomes || [])].filter(Boolean))];
+}
+
 function renderizarMenuPerfis(nomes) {
   const lista = document.getElementById("listaPerfisPublicos");
   lista.replaceChildren();
-  const unicos = [...new Set([Estado.nomePerfilAtivo, ...nomes].filter(Boolean))];
-  unicos.forEach((nome) => {
+  nomesUnicos(nomes).forEach((nome) => {
     const botao = document.createElement("button");
     botao.type = "button";
     botao.className = "menu-perfis__botao";
@@ -71,7 +87,7 @@ function renderizarMenuPerfis(nomes) {
     botao.addEventListener("click", () => selecionarPerfil(nome));
     lista.appendChild(botao);
   });
-  if (!unicos.length) {
+  if (!lista.children.length) {
     const vazio = document.createElement("p");
     vazio.className = "menu-perfis__vazio";
     vazio.textContent = "Nenhum perfil disponível.";
@@ -80,17 +96,50 @@ function renderizarMenuPerfis(nomes) {
   marcarPerfilSelecionado();
 }
 
-async function carregarMenuPerfis(promessaPerfis = null) {
-  try {
-    const dados = promessaPerfis ? await promessaPerfis : await listarPerfisPublicosRemoto();
-    if (!dados) throw new Error("Menu temporariamente indisponível.");
-    renderizarMenuPerfis(dados.perfis);
-  } catch (erro) {
-    // Compatibilidade temporária com uma implantação antiga do Apps Script:
-    // mantém o perfil ativo visível até o backend novo ser publicado.
-    renderizarMenuPerfis([]);
-  }
-}
+const ModalPerfil = {
+  el: null,
+  lista: null,
+  erro: null,
+  iniciar() {
+    this.el = document.getElementById("modalPerfil");
+    this.lista = document.getElementById("listaPerfisEntrada");
+    this.erro = document.getElementById("erroPerfilEntrada");
+  },
+  renderizar(nomes) {
+    this.lista.replaceChildren();
+    nomesUnicos(nomes).forEach((nome) => {
+      const botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "perfil-entrada__botao";
+      const titulo = document.createElement("strong");
+      titulo.textContent = nome;
+      const legenda = document.createElement("span");
+      legenda.textContent = "Entrar nesta roleta";
+      botao.append(titulo, legenda);
+      botao.addEventListener("click", async () => {
+        this.erro.classList.add("oculto");
+        const carregou = await selecionarPerfil(nome, { silencioso: true });
+        if (carregou) this.fechar();
+        else {
+          this.erro.textContent = "Não foi possível abrir este perfil. Verifique a conexão e tente novamente.";
+          this.erro.classList.remove("oculto");
+        }
+      });
+      this.lista.appendChild(botao);
+    });
+    if (!this.lista.children.length) {
+      const status = document.createElement("span");
+      status.className = "lista-perfis-entrada__status";
+      status.textContent = "Nenhum perfil foi criado ainda.";
+      this.lista.appendChild(status);
+    }
+  },
+  abrir(nomes) {
+    this.renderizar(nomes);
+    this.el.classList.remove("oculto");
+  },
+  fechar() { this.el.classList.add("oculto"); }
+};
 
 const ModalNome = {
   el: null, input: null, erro: null,
@@ -120,51 +169,47 @@ const ModalNome = {
 
 const ModalResultado = {
   el: null,
+  timer: 0,
   iniciar() {
     this.el = document.getElementById("modalResultado");
     document.getElementById("btnFecharResultado").addEventListener("click", () => this.fechar());
   },
-  abrir(premio, nome) {
+  abrir(premio, nome = "") {
+    clearTimeout(this.timer);
     const selo = document.getElementById("resultadoSelo");
     selo.className = "resultado-selo " + (premio.positivo ? "positivo" : "negativo");
     selo.textContent = premio.positivo ? "★" : "…";
-    document.getElementById("resultadoNome").textContent = nome;
+    const participante = document.getElementById("resultadoNome");
+    participante.textContent = nome;
+    participante.classList.toggle("oculto", !nome);
     document.getElementById("resultadoPremio").textContent = premio.nome;
     document.getElementById("resultadoStatus").textContent = premio.descricao || "";
     this.el.classList.remove("oculto");
+    if (MODO_TELA) this.timer = setTimeout(() => this.fechar(), 12000);
   },
-  fechar() { this.el.classList.add("oculto"); }
+  fechar() {
+    clearTimeout(this.timer);
+    this.el.classList.add("oculto");
+  }
 };
 
 async function iniciarFluxoDeGiro(nomeParticipante) {
   if (Estado.girando) return;
   Estado.girando = true;
-
   document.getElementById("btnGirar").disabled = true;
   mostrarToast("Confirmando e registrando o giro…");
-
   try {
     const idGiro = gerarIdSeguro();
     let registro;
     try {
       registro = await sortearGiroRemoto(nomeParticipante, idGiro, Estado.nomePerfilAtivo);
     } catch (primeiroErro) {
-      // A mesma chave torna a repetição segura caso o servidor tenha gravado,
-      // mas a primeira resposta tenha se perdido.
       registro = await sortearGiroRemoto(nomeParticipante, idGiro, Estado.nomePerfilAtivo);
     }
-
-    const premioEscolhido = registro.premio;
-    if (Array.isArray(registro.premios) && registro.premios.length >= 2) {
-      Estado.config.premios = registro.premios;
-    } else if (!Estado.config.premios.some((p) => p.id === premioEscolhido.id)) {
-      Estado.config.premios = [premioEscolhido, ...Estado.config.premios];
-    }
-    Estado.nomePerfilAtivo = registro.perfil;
-    Roleta.desenhar(Estado.anguloAtual);
+    prepararRoletaParaResultado(registro);
     tocarSom("audioGiro");
-    const duracaoMs = (Estado.config.roleta && Estado.config.roleta.duracaoGiroMs) || 4800;
-    girarRoleta(premioEscolhido, duracaoMs, () => finalizarGiro(registro));
+    const duracaoMs = Estado.config.roleta?.duracaoGiroMs || 4800;
+    girarRoleta(registro.premio, duracaoMs, () => finalizarGiroLocal(registro));
   } catch (erro) {
     Estado.girando = false;
     document.getElementById("btnGirar").disabled = false;
@@ -172,16 +217,20 @@ async function iniciarFluxoDeGiro(nomeParticipante) {
   }
 }
 
-function finalizarGiro(registroRemoto) {
-  const premio = registroRemoto.premio;
-  const nomeParticipante = registroRemoto.nome;
+function prepararRoletaParaResultado(registro) {
+  const premio = registro.premio;
+  if (Array.isArray(registro.premios) && registro.premios.length >= 2) {
+    Estado.config.premios = registro.premios;
+  } else if (!Estado.config.premios.some((item) => item.id === premio.id)) {
+    Estado.config.premios = [premio, ...Estado.config.premios];
+  }
+  Estado.nomePerfilAtivo = registro.perfil || Estado.nomePerfilAtivo;
+  Roleta.desenhar(Estado.anguloAtual);
+}
+
+function efeitosDoResultado(premio) {
   pararSom("audioGiro");
   tocarSom("audioParada");
-
-  const registro = { nome: nomeParticipante, data: registroRemoto.data };
-
-  adicionarHistorico(registro);
-
   if (premio.positivo) {
     tocarSom("audioVitoria");
     Confete.fogosDeArtificio();
@@ -190,11 +239,56 @@ function finalizarGiro(registroRemoto) {
     document.getElementById("canvasRoleta").parentElement.classList.add("tremer");
     setTimeout(() => document.getElementById("canvasRoleta").parentElement.classList.remove("tremer"), 400);
   }
+}
 
-  ModalResultado.abrir(premio, nomeParticipante);
-
+function finalizarGiroLocal(registro) {
+  efeitosDoResultado(registro.premio);
+  adicionarHistorico({ nome: registro.nome, data: registro.data });
+  ModalResultado.abrir(registro.premio, registro.nome);
   Estado.girando = false;
   document.getElementById("btnGirar").disabled = false;
+}
+
+async function executarGiroNaTela(evento) {
+  if (Estado.girando || !evento?.premio || evento.perfil !== Estado.nomePerfilAtivo) return;
+  Estado.girando = true;
+  prepararRoletaParaResultado({ premio: evento.premio, premios: evento.premios, perfil: evento.perfil });
+  tocarSom("audioGiro");
+  const duracaoMs = Estado.config.roleta?.duracaoGiroMs || 4800;
+  girarRoleta(evento.premio, duracaoMs, () => {
+    efeitosDoResultado(evento.premio);
+    ModalResultado.abrir(evento.premio);
+    Estado.girando = false;
+  });
+}
+
+function atualizarStatusTela(texto, conectado) {
+  const status = document.getElementById("statusTela");
+  status.textContent = texto;
+  status.classList.remove("oculto");
+  status.classList.toggle("status-tela--conectado", conectado);
+}
+
+function iniciarSincronizacaoTela() {
+  clearTimeout(timerSincronizacao);
+  const consultar = async () => {
+    try {
+      const evento = await buscarUltimoGiroRemoto(Estado.nomePerfilAtivo);
+      atualizarStatusTela(`Tela conectada • ${Estado.nomePerfilAtivo}`, true);
+      if (evento?.idGiro && evento.idGiro !== ultimoEventoId) {
+        const primeiroEvento = !ultimoEventoId;
+        ultimoEventoId = evento.idGiro;
+        const criadoEm = Date.parse(evento.criadoEm || "");
+        const aconteceuDepoisDeAbrir = Number.isFinite(criadoEm) && criadoEm >= INICIO_DA_ESCUTA - 2000;
+        if (!primeiroEvento || aconteceuDepoisDeAbrir) await executarGiroNaTela(evento);
+      }
+    } catch (erro) {
+      atualizarStatusTela("Reconectando à roleta…", false);
+    } finally {
+      timerSincronizacao = setTimeout(consultar, 900);
+    }
+  };
+  consultar();
 }
 
 function configurarTelaCheia() {
@@ -208,13 +302,13 @@ function configurarTelaCheia() {
 }
 
 async function iniciarAplicacao() {
-  // Configuração ativa e nomes do menu são independentes: buscá-los juntos
-  // reduz quase pela metade a espera em conexões com maior latência.
+  if (MODO_TELA) document.body.classList.add("modo-tela");
+  ModalPerfil.iniciar();
+  if (MODO_TELA) ModalPerfil.fechar();
   const promessaPerfis = listarPerfisPublicosRemoto().catch(() => null);
   const { nome, config } = await obterConfigParaExibir();
   Estado.config = config;
   Estado.nomePerfilAtivo = nome;
-
   aplicarVisualNaTela(Estado.config);
   carregarSonsNosElementos(Estado.config);
   atualizarResumoPerfil();
@@ -224,20 +318,33 @@ async function iniciarAplicacao() {
   ModalNome.iniciar();
   ModalResultado.iniciar();
   configurarTelaCheia();
-  carregarMenuPerfis(promessaPerfis);
 
-  // O primeiro desenho nunca depende da fonte web; quando ela terminar de
-  // carregar, fazemos um único refinamento dos textos fora de qualquer giro.
+  const dadosPerfis = await promessaPerfis;
+  const perfis = dadosPerfis?.perfis || [];
+  renderizarMenuPerfis(perfis);
   document.fonts?.ready.then(() => {
     if (!Estado.girando) Roleta.desenhar(Estado.anguloAtual);
   });
 
+  if (MODO_TELA) {
+    const perfilTela = PERFIL_DA_URL || dadosPerfis?.ativo || Estado.nomePerfilAtivo;
+    const carregou = await selecionarPerfil(perfilTela, { silencioso: true });
+    document.getElementById("btnGirar").disabled = true;
+    document.getElementById("textoCentral").textContent = "AGUARDANDO";
+    if (!carregou || !Estado.nomePerfilAtivo) {
+      atualizarStatusTela("Perfil não encontrado. Confira a URL da tela.", false);
+      return;
+    }
+    iniciarSincronizacaoTela();
+    return;
+  }
+
+  ModalPerfil.abrir(perfis);
   document.getElementById("btnGirar").addEventListener("click", () => {
     if (Estado.girando) return;
     tocarSom("audioClique");
     ModalNome.abrir();
   });
-
 }
 
 document.addEventListener("DOMContentLoaded", iniciarAplicacao);

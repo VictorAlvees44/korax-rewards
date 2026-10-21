@@ -8,7 +8,14 @@ const config = JSON.parse(readFileSync(new URL("../config.json", import.meta.url
 const uuid = (valor) => `${valor.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000`;
 
 function backend(gerarUuid = () => uuid(0)) {
-  const contexto = vm.createContext({ Utilities: { getUuid: gerarUuid } });
+  const contexto = vm.createContext({
+    Utilities: {
+      getUuid: gerarUuid,
+      DigestAlgorithm: { SHA_256: "SHA_256" },
+      Charset: { UTF_8: "UTF_8" },
+      computeDigest: (_, valor) => Array.from({ length: 32 }, (__, indice) => (String(valor).charCodeAt(indice % String(valor).length) || indice) - 128)
+    }
+  });
   vm.runInContext(codigo, contexto);
   return contexto;
 }
@@ -50,6 +57,42 @@ test("a configuração do servidor descarta pesos legados", () => {
   entrada.premios[0].peso = 999;
   const normalizada = ctx.validarENormalizarConfig(entrada);
   assert.equal("peso" in normalizada.premios[0], false);
+});
+
+test("o servidor mantém os três áudios oficiais em todos os perfis", () => {
+  const ctx = backend();
+  const entrada = structuredClone(config);
+  entrada.sons = { giro: "data:audio/mpeg;base64,alterado", vitoria: "https://example.com/outro.mp3", derrota: "", clique: "x", parada: "y" };
+  const normalizada = JSON.parse(JSON.stringify(ctx.validarENormalizarConfig(entrada)));
+  assert.deepEqual(normalizada.sons, {
+    giro: "assets/audio/roleta-girando.mp3",
+    vitoria: "assets/audio/palmas.mp3",
+    derrota: "assets/audio/naruto-sad.mp3",
+    clique: "",
+    parada: ""
+  });
+});
+
+test("o evento da tela transmite o prêmio, mas nunca o nome da pessoa", () => {
+  const ctx = backend();
+  const cache = new Map();
+  ctx.CacheService = { getScriptCache: () => ({
+    put: (chave, valor) => cache.set(chave, valor),
+    get: (chave) => cache.get(chave) || null
+  }) };
+  ctx.tentarPublicarEventoGiro({
+    idGiro: "1234567890abcdef",
+    nome: "Nome que não pode vazar",
+    perfil: "Comercial",
+    premio: config.premios[0],
+    premios: config.premios
+  });
+  const evento = JSON.parse(JSON.stringify(ctx.obterUltimoGiro("Comercial")));
+  assert.equal(evento.idGiro, "1234567890abcdef");
+  assert.equal(evento.premio.id, config.premios[0].id);
+  assert.equal(evento.premios.length, config.premios.length);
+  assert.equal("nome" in evento, false);
+  assert.doesNotMatch(JSON.stringify(evento), /Nome que não pode vazar/);
 });
 
 test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {

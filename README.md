@@ -9,13 +9,16 @@ Produção: <https://victoralvees44.github.io/korax-rewards/>
 ```text
 Navegador público ── sorteio/registro ──> Google Apps Script ──> Sheets + e-mail
         │                                      │
-        └── cache somente de layout             └── perfis no Google Drive
+        └── escolha de perfil                    ├── perfis no Google Drive
+                                               └── evento temporário do giro
+
+Corporate Screen (modo tela) ── consulta evento ──┘
 
 Painel /admin ── segredo em sessionStorage ──> validação com ADMIN_SECRET
 ```
 
 - `index.html`: roleta pública.
-- `admin/`: painel autenticado de perfis e aparência.
+- `admin/`: painel autenticado somente para prêmios e perfis.
 - `core.js`: comunicação, validação, desenho e efeitos compartilhados.
 - `roleta-app.js`: fluxo público.
 - `google-apps-script/`: backend que deve ser copiado para a planilha.
@@ -29,10 +32,11 @@ Painel /admin ── segredo em sessionStorage ──> validação com ADMIN_SEC
 - Se o backend falhar, nenhum resultado não oficial é exibido. A aplicação requer internet para girar.
 - A data registrada vem do servidor, no fuso `America/Sao_Paulo`.
 - Dados gravados no Sheets são neutralizados contra fórmulas maliciosas.
-- Alterar, publicar, listar ou excluir perfis exige `ADMIN_SECRET`.
+- Alterar, salvar, listar ou excluir perfis exige `ADMIN_SECRET`.
 - O segredo administrativo permanece apenas na memória do módulo e no `sessionStorage` da aba; nunca é gravado no repositório ou enviado em URL.
 - O backend limita cada identificador de navegador a 20 giros por janela de cinco minutos. Esse limite reduz abuso acidental, mas não substitui CAPTCHA/WAF quando o link for divulgado em larga escala.
 - O painel valida a senha em uma chamada curta, carrega só o perfil ativo na entrada e busca a biblioteca completa apenas ao abrir **Perfis**. Lentidão na biblioteca não faz o login parecer inválido.
+- A tela remota recebe ID, perfil e prêmio por um evento temporário. O nome do participante não é transmitido para a Corporate Screen.
 
 ## Implantar o Google Apps Script
 
@@ -69,30 +73,37 @@ Em seguida abra `SUA_URL/exec?acao=configAtivo`. Antes do primeiro perfil public
 
 1. Acesse `/admin/`.
 2. Digite exatamente o valor definido em `ADMIN_SECRET`.
-3. Monte o perfil, salve e clique em **Publicar este layout na roleta pública**.
-4. Use **Sair** em computadores compartilhados.
+3. Edite os prêmios, abra **Perfis** e crie `Comercial` e `Feira` (ou os nomes desejados).
+4. Use **Salvar alterações deste perfil** depois de editar uma roleta existente.
+5. Use **Sair** em computadores compartilhados.
 
-Uploads individuais de imagem ou áudio são limitados a 2 MB. O perfil completo não pode ultrapassar 8 MB. SVG não é aceito, reduzindo risco de conteúdo ativo.
-
-Os sons padrão versionados em `assets/audio/` são: `roleta-girando.mp3` durante o giro, `palmas.mp3` para resultados positivos e `naruto-sad.mp3` para resultados negativos. O áudio de giro é interrompido antes de tocar o som do resultado.
+Os sons são definitivos e não aparecem no painel: `roleta-girando.mp3` durante o giro, `palmas.mp3` para resultados positivos e `naruto-sad.mp3` para resultados negativos. O backend também substitui sons antigos por esses arquivos ao salvar um perfil.
 
 ## Uso pelo comercial: prêmios, cores e chances
 
 1. Entre no admin e abra **Prêmios**. Edite o título e escolha o tipo (positivo/negativo). Categoria e mensagem não aparecem no formulário, mantendo o cadastro simples para o comercial.
 2. Clique em **Adicionar prêmio** para criar um resultado com uma cor aleatória ainda não usada. Cada perfil aceita de 2 a 50 resultados.
 3. Para trocar uma cor, clique em **↻**. A nova cor também exclui todas as cores atuais, inclusive a que está sendo substituída. Não há seletor manual de cores dos prêmios.
-4. **Testar giro** apenas anima a prévia, sem criar registros na planilha. A edição fica bloqueada durante a animação para não mudar os prêmios no meio do teste.
-5. Clique em **Publicar este layout** para torná-lo a opção inicial. Salvar na biblioteca adiciona ou atualiza o perfil no menu, mas não troca a opção inicial.
+4. Clique em **Salvar alterações deste perfil**. Para criar outro conjunto de prêmios, abra **Perfis**, informe o novo nome e use **Criar novo perfil com estes prêmios**.
 
-Na página pública, os perfis salvos aparecem no menu lateral. O visitante pode escolher a roleta antes de girar; o prêmio é exibido na tela, mas o registro operacional guarda somente nome e data.
+Ao entrar na página pública, o usuário escolhe o perfil antes de ver a roleta. Os perfis continuam disponíveis no menu lateral para troca; o prêmio é exibido na tela, mas o registro operacional guarda somente nome e data.
 
-Durante o salvamento e a publicação, o painel bloqueia novas edições até a resposta do servidor, mantendo a biblioteca e a roleta na mesma versão dos prêmios.
+Durante o salvamento, o painel bloqueia novas edições até a resposta do servidor, mantendo a biblioteca e a roleta na mesma versão dos prêmios.
 
 Cada item tem probabilidade `1 / quantidade de itens` em cada giro. Não há pesos, sequência predeterminada ou influência de nome, categoria, cor, tipo ou histórico. Resultados podem se repetir entre giros; somente as cores do mesmo perfil não podem se repetir. Probabilidades iguais não significam quantidades idênticas de resultados em poucas tentativas.
 
 O sorteio oficial acontece no servidor usando o gerador pseudoaleatório de UUID do Google, com rejeição da sobra antes de calcular o índice (evita viés de módulo). A documentação de [`Utilities.getUuid`](https://developers.google.com/apps-script/reference/utilities/utilities#getUuid()) informa equivalência com `java.util.UUID.randomUUID()`. A prévia e as cores usam `crypto.getRandomValues` no navegador. Isso não é uma certificação externa de sorteios.
 
-Perfis antigos ou importados com cores iguais são corrigidos ao abrir no admin: os prêmios são preservados e apenas as cores repetidas são sorteadas novamente. Publique o perfil para persistir a correção. O backend atualizado recusa salvar/publicar configurações com cores duplicadas; leituras legadas continuam permitidas para não perder perfis antigos.
+Perfis antigos com cores iguais são corrigidos ao abrir no admin: os prêmios são preservados e apenas as cores repetidas são sorteadas novamente. Salve o perfil para persistir a correção. O backend atualizado recusa salvar configurações com cores duplicadas; leituras legadas continuam permitidas para não perder perfis antigos.
+
+## Corporate Screen / Tela Corporativa
+
+Cadastre uma página web no painel `https://telas.telacorporativa.com.br/admin` usando uma URL de modo tela. Exemplos:
+
+- Comercial: `https://victoralvees44.github.io/korax-rewards/?modo=tela&perfil=Comercial`
+- Feira: `https://victoralvees44.github.io/korax-rewards/?modo=tela&perfil=Feira`
+
+A tela deve permanecer aberta antes do giro. O notebook usa a URL pública normal, escolhe o mesmo perfil e realiza o giro. A página da Corporate Screen consulta somente o evento temporário daquele perfil e anima o mesmo prêmio. O modo tela não exibe controles de edição nem registra novamente o participante.
 
 ## Planilhas e idempotência
 
@@ -109,7 +120,7 @@ Antes de uma campanha real:
 - Edite `privacidade.html` com razão social, contato do controlador e canal para solicitações LGPD.
 - Defina formalmente o prazo de retenção e uma rotina de exclusão/anonimização na planilha.
 - Restrinja o compartilhamento da planilha e da pasta de perfis no Google Drive.
-- Faça backup dos perfis pelo botão **Exportar JSON** e backup periódico da planilha.
+- Faça backup periódico da planilha e da pasta de perfis no Google Drive.
 - Monitore os registros de execução e as cotas de e-mail do Apps Script.
 
 ## Desenvolvimento e verificações
@@ -131,3 +142,4 @@ Para testar a interface sem Google, execute `node scripts/serve-ui-fixture.mjs` 
 - O GitHub Pages não permite configurar todos os cabeçalhos HTTP. Uma CSP equivalente é fornecida por `<meta>`. Para cabeçalhos como HSTS e `X-Content-Type-Options`, use um domínio atrás de Cloudflare ou outro host configurável.
 - O limite por identificador do navegador é uma barreira operacional, não uma identidade forte. Campanhas públicas de alto valor devem adicionar proteção de borda, CAPTCHA ou emissão de convites individuais.
 - O frontend pode continuar exibindo o último layout em cache quando a consulta de perfil falhar, mas giros novos só ocorrem com confirmação do servidor.
+- O player da Corporate Screen precisa conseguir abrir páginas HTTPS externas e manter acesso à internet. Alguns players bloqueiam reprodução automática de áudio; nesse caso, o som continua sendo reproduzido no notebook que iniciou o giro.

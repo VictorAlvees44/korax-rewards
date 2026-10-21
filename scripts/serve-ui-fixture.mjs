@@ -14,9 +14,10 @@ inicial.premios[1].cor = inicial.premios[0].cor.toLowerCase();
 const alternativo = structuredClone(inicial);
 alternativo.empresa.tituloRoleta = "Roleta da Convenção";
 alternativo.premios = alternativo.premios.slice(0, 4);
-const perfis = new Map([["Teste local", inicial], ["Convenção Korax", alternativo]]);
-let ativo = { nome: "Teste local", config: structuredClone(inicial) };
+const perfis = new Map([["Comercial", inicial], ["Feira", alternativo]]);
+let ativo = { nome: "Comercial", config: structuredClone(inicial) };
 let numeroGiroFicticio = 0;
+const ultimoEventoPorPerfil = new Map();
 const arquivos = new Map([
   ["/", ["index.html", "text/html"]],
   ["/index.html", ["index.html", "text/html"]],
@@ -57,6 +58,10 @@ const servidor = createServer(async (req, res) => {
         responder({ status: "sucesso", dados: { nome, config } });
         return;
       }
+      if (req.method === "GET" && url.searchParams.get("acao") === "ultimoGiro") {
+        responder({ status: "sucesso", dados: ultimoEventoPorPerfil.get(url.searchParams.get("perfil")) || null });
+        return;
+      }
       let corpo = "";
       for await (const parte of req) {
         corpo += parte;
@@ -67,6 +72,13 @@ const servidor = createServer(async (req, res) => {
         const nomePerfil = dados.perfil && perfis.has(dados.perfil) ? dados.perfil : ativo.nome;
         const configPerfil = perfis.get(nomePerfil) || ativo.config;
         const premio = configPerfil.premios[numeroGiroFicticio++ % configPerfil.premios.length];
+        ultimoEventoPorPerfil.set(nomePerfil, {
+          idGiro: dados.idGiro,
+          perfil: nomePerfil,
+          premio,
+          premios: configPerfil.premios,
+          criadoEm: new Date().toISOString()
+        });
         responder({
           status: "sucesso",
           dados: {

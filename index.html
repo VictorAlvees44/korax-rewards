@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' data: blob: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' data: blob: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>Roleta da Sorte Corporativa</title>
 <meta name="description" content="Roleta da sorte corporativa para campanhas comerciais e eventos">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://script.google.com">
 <link rel="dns-prefetch" href="https://script.googleusercontent.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Poppins:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260914-contrast">
+<link rel="stylesheet" href="style.css?v=20261021-tela">
 </head>
 <body>
 
@@ -38,6 +38,7 @@
 
     <main class="centro-roleta">
       <h1 class="topo__titulo" id="topoTitulo">Roleta da Sorte</h1>
+      <p id="statusTela" class="status-tela oculto" role="status">Conectando à roleta…</p>
       <div class="arena">
         <div class="arena__roleta-wrap">
           <div class="ponteiro" aria-hidden="true"></div>
@@ -57,6 +58,19 @@
     </aside>
   </div>
 </section>
+
+<!-- ======================= MODAL: ESCOLHA DO PERFIL ======================= -->
+<div id="modalPerfil" class="modal modal-perfil" role="dialog" aria-modal="true" aria-labelledby="modalPerfilTitulo">
+  <div class="modal__caixa modal__caixa--perfil">
+    <p class="modal-perfil__marca">KORAX</p>
+    <h2 id="modalPerfilTitulo">Entrar em qual perfil?</h2>
+    <p>Escolha a roleta que será usada agora.</p>
+    <div id="listaPerfisEntrada" class="lista-perfis-entrada" aria-live="polite">
+      <span class="lista-perfis-entrada__status">Carregando perfis…</span>
+    </div>
+    <p id="erroPerfilEntrada" class="erro oculto" role="alert"></p>
+  </div>
+</div>
 
 <!-- ======================= MODAL: NOME DO PARTICIPANTE ======================= -->
 <div id="modalNome" class="modal oculto" role="dialog" aria-modal="true" aria-labelledby="modalNomeTitulo">
@@ -95,7 +109,7 @@
 <audio id="audioClique" preload="metadata"></audio>
 <audio id="audioParada" preload="metadata"></audio>
 
-<script src="config.js?v=20260903-sons"></script>
-<script src="roleta-app.js?v=20260916-registros" type="module"></script>
+<script src="config.js?v=20261021-tela"></script>
+<script src="roleta-app.js?v=20261021-tela" type="module"></script>
 </body>
 </html>
