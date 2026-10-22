@@ -10,10 +10,10 @@ import {
   Estado, Roleta,
   buscarConfigAtivoRemoto, listarPerfisRemoto, salvarPerfilRemoto,
   ativarPerfilRemoto, excluirPerfilRemoto,
-  autenticarAdminRemoto, configurarCredencialAdmin, validarConfiguracao,
+  autenticarAdminRemoto, configurarTokenAdmin, obterUrlLoginAdmin, validarConfiguracao,
   gerarId, gerarCorAleatoria, corrigirCoresRepetidas, mostrarToast,
   obterUrlBackend
-} from "../core.js?v=20261021-tela";
+} from "../core.js?v=20261022-workspace";
 
 let Perfis = {}; // cache local em memória do que veio do backend: { nome: config }
 let painelOcupado = false;
@@ -21,7 +21,7 @@ let perfisCarregados = false;
 let carregandoPerfis = null;
 let painelConfigurado = false;
 let painelPronto = false;
-const CHAVE_SESSAO_ADMIN = "roletaCorp_admin_secret_v1";
+const CHAVE_SESSAO_ADMIN = "roletaCorp_admin_token_v2";
 
 /* ========================================================================
    CONFIGURAÇÃO DE PARTIDA (SEM BACKEND / MODO OFFLINE)
@@ -384,13 +384,11 @@ async function iniciarPainel(promessaAtivo) {
 
 function configurarLoginAdmin() {
   const tela = document.getElementById("telaLoginAdmin");
-  const formulario = document.getElementById("formLoginAdmin");
-  const input = document.getElementById("inputSegredoAdmin");
   const erro = document.getElementById("erroLoginAdmin");
   const botao = document.getElementById("btnEntrarAdmin");
 
-  const entrar = async (segredo) => {
-    botao.disabled = true;
+  const entrar = async (token) => {
+    botao.setAttribute("aria-disabled", "true");
     botao.textContent = "Verificando acesso…";
     erro.classList.add("oculto");
     // O perfil ativo já é público; podemos buscá-lo enquanto o servidor
@@ -400,9 +398,9 @@ function configurarLoginAdmin() {
       (falha) => ({ erro: falha })
     );
     try {
-      await autenticarAdminRemoto(segredo);
+      await autenticarAdminRemoto(token);
     } catch (falha) {
-      configurarCredencialAdmin("");
+      configurarTokenAdmin("");
       sessionStorage.removeItem(CHAVE_SESSAO_ADMIN);
       erro.textContent = /demorou demais/.test(falha.message)
         ? "O Apps Script levou mais de 30 segundos para validar o acesso. Verifique a conexão e tente novamente."
@@ -412,13 +410,13 @@ function configurarLoginAdmin() {
       const painel = document.getElementById("painelAdmin");
       painel.setAttribute("inert", "");
       painel.setAttribute("aria-hidden", "true");
-      input.focus();
-      botao.textContent = "Entrar";
-      botao.disabled = false;
+      botao.textContent = "Entrar com Google Workspace";
+      botao.removeAttribute("aria-disabled");
+      botao.focus();
       return;
     }
 
-    sessionStorage.setItem(CHAVE_SESSAO_ADMIN, segredo);
+    sessionStorage.setItem(CHAVE_SESSAO_ADMIN, token);
     botao.textContent = "Carregando roleta…";
     try {
       await iniciarPainel(promessaAtivo);
@@ -426,35 +424,46 @@ function configurarLoginAdmin() {
       const painel = document.getElementById("painelAdmin");
       painel.removeAttribute("inert");
       painel.setAttribute("aria-hidden", "false");
-      input.value = "";
     } catch (falha) {
       erro.textContent = "Acesso autorizado, mas a roleta ativa não carregou: " + falha.message + " Tente entrar novamente.";
       erro.classList.remove("oculto");
-      // O segredo validado continua na sessão; isto não é falha de login.
+      // O token validado continua na sessão; isto não é falha de login.
     } finally {
-      botao.textContent = "Entrar";
-      botao.disabled = false;
+      botao.textContent = "Entrar com Google Workspace";
+      botao.removeAttribute("aria-disabled");
     }
   };
 
-  formulario.addEventListener("submit", (evento) => {
+  botao.addEventListener("click", (evento) => {
     evento.preventDefault();
-    entrar(input.value);
+    if (botao.getAttribute("aria-disabled") === "true") return;
+    const urlLogin = obterUrlLoginAdmin();
+    if (!urlLogin) {
+      erro.textContent = "A implantação privada do login administrativo ainda não foi configurada.";
+      erro.classList.remove("oculto");
+      return;
+    }
+    location.assign(urlLogin);
   });
 
   document.getElementById("btnSairAdmin").addEventListener("click", () => {
-    configurarCredencialAdmin("");
+    configurarTokenAdmin("");
     sessionStorage.removeItem(CHAVE_SESSAO_ADMIN);
     location.reload();
   });
 
-  const salvo = sessionStorage.getItem(CHAVE_SESSAO_ADMIN);
+  const parametrosRetorno = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const recebido = parametrosRetorno.get("adminToken") || "";
+  if (recebido) {
+    sessionStorage.setItem(CHAVE_SESSAO_ADMIN, recebido);
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+  const salvo = recebido || sessionStorage.getItem(CHAVE_SESSAO_ADMIN);
   if (salvo) {
-    input.value = salvo;
     entrar(salvo);
   } else {
     tela.classList.remove("oculto");
-    input.focus();
+    botao.focus();
   }
 }
 

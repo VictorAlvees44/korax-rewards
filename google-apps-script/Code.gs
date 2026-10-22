@@ -2,8 +2,9 @@
  * Backend da Roleta da Sorte Corporativa.
  *
  * Propriedades do script obrigatorias:
- *   ADMIN_SECRET        segredo forte usado apenas pelo painel
- *   EMAIL_DESTINATARIO um ou mais e-mails separados por virgula
+ *   ADMIN_EMAIL         unica conta Workspace autorizada no painel
+ *   ADMIN_TOKEN_SECRET  chave interna criada por configurarAcessoAdmin()
+ *   EMAIL_DESTINATARIO  um ou mais e-mails separados por virgula
  */
 
 // A planilha operacional registra somente os dois dados solicitados.
@@ -17,6 +18,9 @@ var TAMANHO_MAX_REQUISICAO = 8 * 1024 * 1024;
 var LIMITE_GIROS_JANELA = 20;
 var SEGUNDOS_JANELA_GIROS = 300;
 var SEGUNDOS_EVENTO_TELA = 600;
+var SEGUNDOS_SESSAO_ADMIN = 8 * 60 * 60;
+var DOMINIO_WORKSPACE_ADMIN = "koraxbrasil.com.br";
+var URL_RETORNO_ADMIN = "https://victoralvees44.github.io/korax-rewards/admin/";
 var SONS_FIXOS = {
   giro: "assets/audio/roleta-girando.mp3",
   vitoria: "assets/audio/palmas.mp3",
@@ -28,6 +32,7 @@ var SONS_FIXOS = {
 function doGet(e) {
   try {
     var acao = (e && e.parameter && e.parameter.acao) || "saude";
+    if (acao === "loginAdmin") return criarPaginaLoginAdmin();
     if (acao === "configAtivo") return respostaJson({ status: "sucesso", dados: obterConfigAtivo() });
     if (acao === "perfisPublicos") return respostaJson(listarPerfisPublicos());
     if (acao === "perfilPublico") return respostaJson({ status: "sucesso", dados: obterPerfilPublico(e.parameter.nome) });
@@ -37,7 +42,7 @@ function doGet(e) {
       return respostaJson({
         status: "sucesso",
         servico: "Roleta da Sorte Corporativa",
-        configurado: Boolean(props.getProperty("ADMIN_SECRET") && props.getProperty("EMAIL_DESTINATARIO"))
+        configurado: Boolean(props.getProperty("ADMIN_EMAIL") && props.getProperty("ADMIN_TOKEN_SECRET") && props.getProperty("EMAIL_DESTINATARIO"))
       });
     }
     throw new Error("Ação GET inválida.");
@@ -55,11 +60,11 @@ function doPost(e) {
 
     if (acao === "sortearGiro") return respostaJson(sortearERegistrarGiro(corpo));
     if (acao === "autenticarAdmin") {
-      exigirAdmin(corpo.adminSecret);
+      exigirAdmin(corpo.adminToken);
       return respostaJson({ status: "sucesso" });
     }
 
-    exigirAdmin(corpo.adminSecret);
+    exigirAdmin(corpo.adminToken);
     if (acao === "listarPerfis") return respostaJson({ status: "sucesso", perfis: listarPerfis() });
     if (acao === "salvarPerfil") return respostaJson(salvarPerfil(corpo.nome, corpo.config));
     if (acao === "ativarPerfil") return respostaJson(ativarPerfil(corpo.nome, corpo.config));
@@ -70,10 +75,96 @@ function doPost(e) {
   }
 }
 
-function exigirAdmin(segredoRecebido) {
-  var segredoConfigurado = PropertiesService.getScriptProperties().getProperty("ADMIN_SECRET");
-  if (!segredoConfigurado) throw new Error("ADMIN_SECRET não configurado nas propriedades do script.");
-  if (!compararConstante(String(segredoRecebido || ""), segredoConfigurado)) throw new Error("Credencial administrativa inválida.");
+function configurarAcessoAdmin() {
+  var email = String(Session.getEffectiveUser().getEmail() || "").trim().toLowerCase();
+  if (!email || email.split("@")[1] !== DOMINIO_WORKSPACE_ADMIN) {
+    throw new Error("Execute esta função conectado à conta administradora @" + DOMINIO_WORKSPACE_ADMIN + ".");
+  }
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty("ADMIN_EMAIL", email);
+  if (!props.getProperty("ADMIN_TOKEN_SECRET")) {
+    props.setProperty("ADMIN_TOKEN_SECRET", Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid());
+  }
+  return "Acesso administrativo configurado exclusivamente para " + email + ".";
+}
+
+function criarPaginaLoginAdmin() {
+  var props = PropertiesService.getScriptProperties();
+  var autorizado = String(props.getProperty("ADMIN_EMAIL") || "").trim().toLowerCase();
+  var emailAtivo = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+  if (!autorizado || !props.getProperty("ADMIN_TOKEN_SECRET")) {
+    throw new Error("Execute configurarAcessoAdmin() antes de usar o painel.");
+  }
+  if (!emailAtivo || emailAtivo !== autorizado || emailAtivo.split("@")[1] !== DOMINIO_WORKSPACE_ADMIN) {
+    throw new Error("Esta conta do Google Workspace não possui acesso administrativo.");
+  }
+
+  var token = emitirTokenAdmin(emailAtivo);
+  var destino = URL_RETORNO_ADMIN + "#adminToken=" + encodeURIComponent(token);
+  var html = '<!doctype html><html lang="pt-BR"><head><base target="_top"><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso Korax</title>' +
+    '<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#070c16;color:#f5f7fb;font:16px Arial,sans-serif}' +
+    'main{width:min(440px,calc(100% - 40px));padding:34px;border:1px solid #8f7522;border-radius:20px;background:#111a2c;box-shadow:0 18px 60px #0008}' +
+    'h1{margin:0 0 12px;color:#efcd56}p{line-height:1.55;color:#cbd3e1}strong{color:#fff}' +
+    'a{display:block;margin-top:24px;padding:16px;border-radius:999px;background:#dfb92d;color:#101010;text-align:center;text-decoration:none;font-weight:800}</style></head>' +
+    '<body><main><h1>Acesso confirmado</h1><p>Conta autorizada: <strong>' + escaparHtml(emailAtivo) +
+    '</strong></p><p>Clique abaixo para abrir o painel administrativo da Korax.</p><a href="' + escaparHtml(destino) +
+    '">CONTINUAR PARA O PAINEL</a></main></body></html>';
+  return HtmlService.createHtmlOutput(html).setTitle("Acesso administrativo Korax");
+}
+
+function emitirTokenAdmin(email) {
+  var agora = Math.floor(Date.now() / 1000);
+  var payload = {
+    v: 1,
+    email: String(email).toLowerCase(),
+    iat: agora,
+    exp: agora + SEGUNDOS_SESSAO_ADMIN,
+    nonce: Utilities.getUuid()
+  };
+  var corpo = base64UrlEncode(JSON.stringify(payload));
+  return corpo + "." + assinarTokenAdmin(corpo);
+}
+
+function exigirAdmin(tokenRecebido) {
+  var token = String(tokenRecebido || "");
+  var partes = token.split(".");
+  if (partes.length !== 2 || !partes[0] || !partes[1]) throw new Error("Sessão administrativa inválida. Entre novamente com o Google Workspace.");
+  var assinaturaEsperada = assinarTokenAdmin(partes[0]);
+  if (!compararConstante(partes[1], assinaturaEsperada)) throw new Error("Sessão administrativa inválida. Entre novamente com o Google Workspace.");
+
+  var payload;
+  try {
+    payload = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(partes[0])).getDataAsString("UTF-8"));
+  } catch (ignorado) {
+    throw new Error("Sessão administrativa inválida. Entre novamente com o Google Workspace.");
+  }
+  var agora = Math.floor(Date.now() / 1000);
+  var autorizado = String(PropertiesService.getScriptProperties().getProperty("ADMIN_EMAIL") || "").trim().toLowerCase();
+  if (payload.v !== 1 || !payload.exp || payload.exp < agora || payload.iat > agora + 60) {
+    throw new Error("Sessão administrativa expirada. Entre novamente com o Google Workspace.");
+  }
+  if (!autorizado || String(payload.email || "").toLowerCase() !== autorizado || autorizado.split("@")[1] !== DOMINIO_WORKSPACE_ADMIN) {
+    throw new Error("Esta conta do Google Workspace não possui acesso administrativo.");
+  }
+  return autorizado;
+}
+
+function assinarTokenAdmin(corpo) {
+  var segredo = PropertiesService.getScriptProperties().getProperty("ADMIN_TOKEN_SECRET");
+  if (!segredo) throw new Error("A autenticação administrativa ainda não foi configurada.");
+  var bytes = Utilities.computeHmacSha256Signature(corpo, segredo, Utilities.Charset.UTF_8);
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, "");
+}
+
+function base64UrlEncode(valor) {
+  return Utilities.base64EncodeWebSafe(String(valor), Utilities.Charset.UTF_8).replace(/=+$/g, "");
+}
+
+function escaparHtml(valor) {
+  return String(valor).replace(/[&<>"']/g, function (caractere) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[caractere];
+  });
 }
 
 function compararConstante(a, b) {

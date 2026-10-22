@@ -14,7 +14,7 @@ Navegador público ── sorteio/registro ──> Google Apps Script ──> Sh
 
 Corporate Screen (modo tela) ── consulta evento ──┘
 
-Painel /admin ── segredo em sessionStorage ──> validação com ADMIN_SECRET
+Painel /admin ── login privado Google Workspace ──> sessão assinada (8 horas)
 ```
 
 - `index.html`: roleta pública.
@@ -32,8 +32,8 @@ Painel /admin ── segredo em sessionStorage ──> validação com ADMIN_SEC
 - Se o backend falhar, nenhum resultado não oficial é exibido. A aplicação requer internet para girar.
 - A data registrada vem do servidor, no fuso `America/Sao_Paulo`.
 - Dados gravados no Sheets são neutralizados contra fórmulas maliciosas.
-- Alterar, salvar, listar ou excluir perfis exige `ADMIN_SECRET`.
-- O segredo administrativo permanece apenas na memória do módulo e no `sessionStorage` da aba; nunca é gravado no repositório ou enviado em URL.
+- Alterar, salvar, listar ou excluir perfis exige uma sessão assinada pelo Apps Script depois do login privado com a única conta Workspace autorizada.
+- A chave de assinatura nunca sai das propriedades do Apps Script. O navegador recebe apenas um token temporário de oito horas, mantido no `sessionStorage` da aba.
 - O backend limita cada identificador de navegador a 20 giros por janela de cinco minutos. Esse limite reduz abuso acidental, mas não substitui CAPTCHA/WAF quando o link for divulgado em larga escala.
 - O painel valida a senha em uma chamada curta, carrega só o perfil ativo na entrada e busca a biblioteca completa apenas ao abrir **Perfis**. Lentidão na biblioteca não faz o login parecer inválido.
 - A tela remota recebe ID, perfil e prêmio por um evento temporário. O nome do participante não é transmitido para a Corporate Screen.
@@ -43,19 +43,25 @@ Painel /admin ── segredo em sessionStorage ──> validação com ADMIN_SEC
 1. Crie ou abra a planilha de registros e acesse **Extensões → Apps Script**.
 2. Substitua `Code.gs` pelo conteúdo de `google-apps-script/Code.gs`.
 3. Ative a exibição do manifesto nas configurações do editor e substitua `appsscript.json` pelo arquivo do repositório.
-4. Em **Configurações do projeto → Propriedades do script**, crie:
+4. Em **Configurações do projeto → Propriedades do script**, mantenha:
 
-   - `ADMIN_SECRET`: senha aleatória longa, exclusiva deste sistema. Recomendado: no mínimo 32 caracteres.
    - `EMAIL_DESTINATARIO`: um ou mais e-mails separados por vírgula.
 
-5. Em **Implantar → Nova implantação → App da Web**, selecione:
+5. No editor, selecione e execute uma vez a função `configurarAcessoAdmin`. Ela identifica a conta proprietária `@koraxbrasil.com.br`, salva `ADMIN_EMAIL` e cria internamente `ADMIN_TOKEN_SECRET`. Não compartilhe nem copie essa chave.
+
+6. Crie ou atualize a implantação pública da API em **Implantar → Nova implantação → App da Web**:
 
    - Executar como: **Eu**.
    - Quem pode acessar: **Qualquer pessoa**. A roleta pública precisa chamar o sorteio; as ações administrativas continuam protegidas dentro do código.
 
-6. Autorize explicitamente Google Drive, planilha e envio de e-mail.
-7. Copie a URL terminada em `/exec` e atualize `webhook.url` em `config.js` e `config.json`.
-8. Após qualquer alteração no backend, use **Gerenciar implantações → Editar → Nova versão**. Salvar `Code.gs` sem criar uma nova versão não atualiza a produção.
+7. Crie uma **segunda implantação** do mesmo projeto, chamada `Login Admin Korax`:
+
+   - Executar como: **Usuário que acessa o app da Web**.
+   - Quem pode acessar: **Somente eu**.
+
+8. Autorize explicitamente o e-mail da conta, Google Drive, planilha e envio de e-mail.
+9. Copie a URL pública terminada em `/exec` para `webhook.url` e a URL privada do login para `admin.authUrl` em `config.js`.
+10. Após alterar o backend, crie uma **Nova versão nas duas implantações**. Salvar `Code.gs` sem implantar uma nova versão não atualiza a produção.
 
 **Importante para esta versão:** o GitHub Pages publica sozinho as mudanças da interface, mas não atualiza o Google Apps Script. Até substituir `Code.gs` e publicar uma nova versão da implantação, a planilha e os e-mails continuarão usando o formato antigo de registro.
 
@@ -71,8 +77,8 @@ Em seguida abra `SUA_URL/exec?acao=configAtivo`. Antes do primeiro perfil public
 
 ## Primeiro acesso ao admin
 
-1. Acesse `/admin/`.
-2. Digite exatamente o valor definido em `ADMIN_SECRET`.
+1. Acesse `/admin/` e clique em **Entrar com Google Workspace**.
+2. O Google abrirá a implantação privada. Somente a conta configurada por `configurarAcessoAdmin()` terá acesso; confirme e clique em **Continuar para o painel**.
 3. Edite os prêmios, abra **Perfis** e crie `Comercial` e `Feira` (ou os nomes desejados).
 4. Use **Salvar alterações deste perfil** depois de editar uma roleta existente.
 5. Use **Sair** em computadores compartilhados.
@@ -135,7 +141,7 @@ npm test
 
 O workflow `.github/workflows/quality.yml` executa validação de sintaxe, JSON, referências locais, CSP, ausência dos fluxos inseguros antigos e testes unitários em cada push ou pull request.
 
-Para testar a interface sem Google, execute `node scripts/serve-ui-fixture.mjs` e abra `http://127.0.0.1:43119/admin/` usando a credencial fictícia `local-test-only`. Esse servidor aceita conexões somente da máquina local, usa perfis descartáveis em memória, exercita a correção de cores legadas e valida salvamento/publicação com o código real do Apps Script. O redirecionamento das chamadas acontece apenas nas respostas HTTP locais: nenhum arquivo de produção é alterado. Os giros simulados não são oficiais, não enviam e-mails e não gravam na planilha. Encerre com `Ctrl+C`.
+Para testar a interface sem Google, execute `node scripts/serve-ui-fixture.mjs`, abra `http://127.0.0.1:43119/admin/` e use o botão de Workspace simulado. Esse servidor aceita conexões somente da máquina local, usa perfis descartáveis em memória, exercita a correção de cores legadas e valida salvamento/publicação com o código real do Apps Script. O redirecionamento das chamadas acontece apenas nas respostas HTTP locais: nenhum arquivo de produção é alterado. Os giros simulados não são oficiais, não enviam e-mails e não gravam na planilha. Encerre com `Ctrl+C`.
 
 ## Limitações conhecidas
 

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
@@ -13,12 +14,36 @@ function backend(gerarUuid = () => uuid(0)) {
       getUuid: gerarUuid,
       DigestAlgorithm: { SHA_256: "SHA_256" },
       Charset: { UTF_8: "UTF_8" },
-      computeDigest: (_, valor) => Array.from({ length: 32 }, (__, indice) => (String(valor).charCodeAt(indice % String(valor).length) || indice) - 128)
+      computeDigest: (_, valor) => Array.from({ length: 32 }, (__, indice) => (String(valor).charCodeAt(indice % String(valor).length) || indice) - 128),
+      computeHmacSha256Signature: (valor, chave) => [...createHmac("sha256", chave).update(valor).digest()].map((byte) => byte > 127 ? byte - 256 : byte),
+      base64EncodeWebSafe: (valor) => Buffer.from(typeof valor === "string" ? valor : valor.map((byte) => byte & 255)).toString("base64url"),
+      base64DecodeWebSafe: (valor) => [...Buffer.from(valor, "base64url")],
+      newBlob: (bytes) => ({ getDataAsString: () => Buffer.from(bytes).toString("utf8") })
     }
   });
   vm.runInContext(codigo, contexto);
   return contexto;
 }
+
+test("somente a sessão assinada da conta Workspace autorizada libera o painel", () => {
+  const ctx = backend();
+  const propriedades = new Map([
+    ["ADMIN_EMAIL", "admin@koraxbrasil.com.br"],
+    ["ADMIN_TOKEN_SECRET", "segredo-interno-de-teste-com-mais-de-32-caracteres"]
+  ]);
+  ctx.PropertiesService = { getScriptProperties: () => ({
+    getProperty: (chave) => propriedades.get(chave) || "",
+    setProperty: (chave, valor) => propriedades.set(chave, valor)
+  }) };
+
+  const token = ctx.emitirTokenAdmin("admin@koraxbrasil.com.br");
+  assert.equal(ctx.exigirAdmin(token), "admin@koraxbrasil.com.br");
+  assert.throws(() => ctx.exigirAdmin(token.replace(/.$/, token.endsWith("A") ? "B" : "A")), /inválida/);
+
+  const tokenOutraConta = ctx.emitirTokenAdmin("outra@koraxbrasil.com.br");
+  assert.throws(() => ctx.exigirAdmin(tokenOutraConta), /não possui acesso/);
+  assert.throws(() => ctx.exigirAdmin("antigo-segredo-compartilhado"), /inválida/);
+});
 
 test("o servidor rejeita a sobra de 32 bits e mantém chances iguais", () => {
   const valores = [0xffffffff, 0xfffffffe, 7];

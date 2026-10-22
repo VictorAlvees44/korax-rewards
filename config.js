@@ -44,6 +44,10 @@ window.CONFIG_PADRAO = {
   webhook: {
     url: "https://script.google.com/macros/s/AKfycbztoFQ0_IT3JV5HJC8ixhmGbEyNi8Kt5oRZoNdkpuPkwOxTxvfytoW1wFkkQFDvVzWZ/exec"
   },
+  admin: {
+    // Implantação separada do mesmo Apps Script, restrita a "Somente eu".
+    authUrl: "https://script.google.com/a/macros/koraxbrasil.com.br/s/AKfycbyoovD76EMFlmq8YAcRmTY2XZ2rf0RqrQAy-YlQqgnQME8VFJRvV5aEQmB3UEOCW6ce/exec"
+  },
   premios: [
     { id: "p1", nome: "Chocolate", cor: "#C9A227", categoria: "Brinde", descricao: "Um chocolate para adoçar o dia", positivo: true, som: "" },
     { id: "p2", nome: "Vale Café", cor: "#2E7D32", categoria: "Brinde", descricao: "Um café por conta da casa", positivo: true, som: "" },

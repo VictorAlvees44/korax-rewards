@@ -1,5 +1,5 @@
 // Ambiente descartável para QA visual. Não chama Google nem grava dados reais.
-// Execute: node scripts/serve-ui-fixture.mjs (segredo fictício: local-test-only).
+// Execute: node scripts/serve-ui-fixture.mjs (login Workspace simulado localmente).
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
@@ -42,6 +42,11 @@ const servidor = createServer(async (req, res) => {
   };
   try {
     const url = new URL(req.url, "http://127.0.0.1:43119");
+    if (url.pathname === "/__test/login") {
+      res.writeHead(302, { Location: "/admin/#adminToken=local-test-token" });
+      res.end();
+      return;
+    }
     if (url.pathname === "/__test/backend") {
       if (req.method === "GET" && url.searchParams.get("acao") === "configAtivo") {
         responder({ status: "sucesso", dados: ativo });
@@ -92,7 +97,7 @@ const servidor = createServer(async (req, res) => {
         });
         return;
       }
-      if (dados.adminSecret !== "local-test-only") throw new Error("Use o segredo fictício local-test-only.");
+      if (dados.adminToken !== "local-test-token") throw new Error("Sessão administrativa local inválida.");
       switch (dados.acao) {
         case "autenticarAdmin": responder({ status: "sucesso" }); break;
         case "listarPerfis": responder({ status: "sucesso", perfis: Object.fromEntries(perfis) }); break;
@@ -118,6 +123,12 @@ const servidor = createServer(async (req, res) => {
       // Substituição somente na resposta local. O arquivo de produção fica intacto.
       conteudo = conteudo.replace(original, 'await fetch("/__test/backend" + new URL(url).search, { ...opcoes, signal: controlador.signal })');
     }
+    if (arquivo[0] === "config.js") {
+      conteudo = conteudo.replace(
+        /authUrl: "https:\/\/script\.google\.com[^\"]+"/,
+        'authUrl: "http://127.0.0.1:43119/__test/login"'
+      );
+    }
     if (arquivo[1] === "text/html") {
       conteudo = conteudo.replace("<body>", '<body><p role="note" style="background:#fff;color:#111;padding:12px;text-align:center">TESTE LOCAL — dados fictícios, sem Google ou registros reais</p>');
       conteudo = conteudo.replace("connect-src 'self' https://script.google.com https://script.googleusercontent.com", "connect-src 'self'");
@@ -130,6 +141,6 @@ const servidor = createServer(async (req, res) => {
 });
 
 servidor.listen(43119, "127.0.0.1", () => {
-  console.log("QA local: http://127.0.0.1:43119/admin/ — segredo fictício: local-test-only");
+  console.log("QA local: http://127.0.0.1:43119/admin/ — use o botão Google Workspace simulado");
   console.log("Perfis existem apenas em memória. Ctrl+C encerra e descarta o teste.");
 });

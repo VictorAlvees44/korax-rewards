@@ -71,6 +71,12 @@ if ((painelAdmin.match(/class="aba/g) || []).length !== 2 || /data-aba="(?:visua
 if (/uploadSom|inputLogoUpload|inputFundoUpload/.test(painelAdmin)) {
   throw new Error("Sons e identidade visual não devem ser editáveis no painel simplificado.");
 }
+if (/type="password"|ADMIN_SECRET|inputSegredoAdmin/.test(painelAdmin) || /adminSecret|ADMIN_SECRET/.test(codigoCliente + gas)) {
+  throw new Error("O painel não deve manter o antigo segredo compartilhado.");
+}
+if (!/Entrar com Google Workspace/.test(painelAdmin) || !/configurarAcessoAdmin/.test(gas) || !/ADMIN_TOKEN_SECRET/.test(gas)) {
+  throw new Error("O painel deve exigir a conta Google Workspace autorizada e uma sessão assinada.");
+}
 if (!/MODO_TELA[\s\S]*buscarUltimoGiroRemoto/.test(fluxoPublico)) {
   throw new Error("A página pública deve oferecer sincronização para a tela corporativa.");
 }

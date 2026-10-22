@@ -10,19 +10,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://script.google.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Poppins:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../style.css?v=20261021-tela">
+<link rel="stylesheet" href="../style.css?v=20261022-workspace">
 </head>
 <body>
 
 <div id="telaLoginAdmin" class="tela-login-admin oculto" role="dialog" aria-modal="true" aria-labelledby="tituloLoginAdmin">
-  <form id="formLoginAdmin" class="modal__caixa login-admin__caixa">
+  <div class="modal__caixa login-admin__caixa">
     <h1 id="tituloLoginAdmin">Acesso administrativo</h1>
-    <p>Digite o segredo configurado na propriedade <code>ADMIN_SECRET</code> do Google Apps Script.</p>
-    <label for="inputSegredoAdmin" class="rotulo">Segredo administrativo</label>
-    <input id="inputSegredoAdmin" class="campo" type="password" autocomplete="current-password" required maxlength="200">
+    <p>Entre com a única conta autorizada do Google Workspace da Korax.</p>
+    <div class="login-admin__workspace" aria-label="Protegido pelo Google Workspace">
+      <span aria-hidden="true">G</span>
+      <div><strong>Google Workspace</strong><small>Somente o administrador autorizado</small></div>
+    </div>
     <p id="erroLoginAdmin" class="erro oculto" role="alert"></p>
-    <button id="btnEntrarAdmin" class="botao-principal" type="submit">Entrar</button>
-  </form>
+    <a id="btnEntrarAdmin" class="botao-principal" href="#">Entrar com Google Workspace</a>
+  </div>
 </div>
 
 <section id="painelAdmin" class="painel" inert aria-hidden="true">
@@ -92,7 +94,7 @@
 
 <div id="avisoToast" class="toast oculto"></div>
 
-<script src="../config.js?v=20261021-tela"></script>
-<script src="admin-app.js?v=20261021-tela" type="module"></script>
+<script src="../config.js?v=20261022-workspace"></script>
+<script src="admin-app.js?v=20261022-workspace" type="module"></script>
 </body>
 </html>

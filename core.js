@@ -25,7 +25,7 @@ export const SONS_FIXOS = Object.freeze({
   parada: ""
 });
 
-let segredoAdmin = "";
+let tokenAdmin = "";
 
 export const Estado = {
   config: null,
@@ -96,14 +96,30 @@ async function fetchComTimeout(url, opcoes, timeoutMs = 15000) {
   }
 }
 
-export function configurarCredencialAdmin(valor) {
-  segredoAdmin = String(valor || "");
+export function configurarTokenAdmin(valor) {
+  tokenAdmin = String(valor || "");
 }
 
 export async function autenticarAdminRemoto(valor) {
-  await chamarBackendPost({ acao: "autenticarAdmin", adminSecret: String(valor || "") }, 30000);
-  configurarCredencialAdmin(valor);
+  await chamarBackendPost({ acao: "autenticarAdmin", adminToken: String(valor || "") }, 30000);
+  configurarTokenAdmin(valor);
   return true;
+}
+
+export function obterUrlLoginAdmin() {
+  const valor = (window.CONFIG_PADRAO && window.CONFIG_PADRAO.admin && window.CONFIG_PADRAO.admin.authUrl) || "";
+  try {
+    const url = new URL(valor, window.location.href);
+    const caminhoAppsScript = /^\/(?:macros|a\/macros\/[^/]+)\/s\/[^/]+\/exec$/.test(url.pathname);
+    const localSeguro = url.protocol === "http:" && url.hostname === "127.0.0.1" && window.location.hostname === "127.0.0.1";
+    if (!localSeguro && (url.protocol !== "https:" || url.hostname !== "script.google.com" || !caminhoAppsScript)) return "";
+    url.search = "";
+    url.hash = "";
+    url.searchParams.set("acao", "loginAdmin");
+    return url.toString();
+  } catch (erro) {
+    return "";
+  }
 }
 
 /** Busca o perfil atualmente publicado para a roleta pública. */
@@ -132,25 +148,25 @@ export async function buscarUltimoGiroRemoto(nome) {
 
 /** Lista todos os perfis salvos na "biblioteca" central. */
 export async function listarPerfisRemoto() {
-  const dados = await chamarBackendPost({ acao: "listarPerfis", adminSecret: segredoAdmin }, 30000);
+  const dados = await chamarBackendPost({ acao: "listarPerfis", adminToken: tokenAdmin }, 30000);
   return dados.perfis || {}; // { nomeDoPerfil: config, ... }
 }
 
 /** Salva (cria ou sobrescreve) um perfil na biblioteca central, sem publicá-lo. */
 export async function salvarPerfilRemoto(nome, config) {
   validarConfiguracao(config);
-  return chamarBackendPost({ acao: "salvarPerfil", nome, config, adminSecret: segredoAdmin });
+  return chamarBackendPost({ acao: "salvarPerfil", nome, config, adminToken: tokenAdmin });
 }
 
 /** Publica um perfil como o que a roleta pública deve exibir agora. */
 export async function ativarPerfilRemoto(nome, config) {
   validarConfiguracao(config);
-  return chamarBackendPost({ acao: "ativarPerfil", nome, config, adminSecret: segredoAdmin });
+  return chamarBackendPost({ acao: "ativarPerfil", nome, config, adminToken: tokenAdmin });
 }
 
 /** Remove um perfil da biblioteca central. */
 export async function excluirPerfilRemoto(nome) {
-  return chamarBackendPost({ acao: "excluirPerfil", nome, adminSecret: segredoAdmin });
+  return chamarBackendPost({ acao: "excluirPerfil", nome, adminToken: tokenAdmin });
 }
 
 /** O backend sorteia e registra atomicamente; o cliente apenas anima o resultado. */
