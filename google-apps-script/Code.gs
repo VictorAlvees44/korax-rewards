@@ -361,14 +361,23 @@ function sortearERegistrarGiro(corpo) {
  */
 function tentarPublicarEventoGiro(resultado) {
   try {
+    var criadoEm = new Date().toISOString();
     var evento = {
       idGiro: resultado.idGiro,
       perfil: resultado.perfil,
       premio: resultado.premio,
       premios: resultado.premios,
-      criadoEm: new Date().toISOString()
+      criadoEm: criadoEm
     };
     CacheService.getScriptCache().put(chaveEventoPerfil(resultado.perfil), JSON.stringify(evento), SEGUNDOS_EVENTO_TELA);
+    // O CacheService pode descartar entradas antes do prazo. Mantemos uma cópia
+    // mínima e temporariamente válida para a TV não perder o giro.
+    PropertiesService.getScriptProperties().setProperty(chaveEventoPersistentePerfil(resultado.perfil), JSON.stringify({
+      idGiro: resultado.idGiro,
+      perfil: resultado.perfil,
+      premio: resultado.premio,
+      criadoEm: criadoEm
+    }));
   } catch (erro) {
     console.warn("Falha ao transmitir o giro para a tela: " + String(erro.message || erro).substring(0, 160));
   }
@@ -377,10 +386,13 @@ function tentarPublicarEventoGiro(resultado) {
 function obterUltimoGiro(nomePerfil) {
   var nome = validarNomePerfil(nomePerfil);
   var texto = CacheService.getScriptCache().get(chaveEventoPerfil(nome));
+  if (!texto) texto = PropertiesService.getScriptProperties().getProperty(chaveEventoPersistentePerfil(nome));
   if (!texto) return null;
   try {
     var evento = JSON.parse(texto);
     if (!evento || evento.perfil !== nome || !evento.idGiro || !evento.premio) return null;
+    var criadoEm = new Date(evento.criadoEm).getTime();
+    if (!isFinite(criadoEm) || Date.now() - criadoEm > SEGUNDOS_EVENTO_TELA * 1000) return null;
     return evento;
   } catch (ignorado) {
     return null;
@@ -391,6 +403,10 @@ function chaveEventoPerfil(nomePerfil) {
   var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(nomePerfil), Utilities.Charset.UTF_8);
   var sufixo = digest.slice(0, 12).map(function (byte) { return (byte + 256).toString(16).slice(-2); }).join("");
   return "tela_" + sufixo;
+}
+
+function chaveEventoPersistentePerfil(nomePerfil) {
+  return "evento_" + chaveEventoPerfil(nomePerfil);
 }
 
 function aplicarLimiteDeGiros(clienteId) {

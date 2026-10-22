@@ -101,9 +101,14 @@ test("o servidor mantém os três áudios oficiais em todos os perfis", () => {
 test("o evento da tela transmite o prêmio, mas nunca o nome da pessoa", () => {
   const ctx = backend();
   const cache = new Map();
+  const propriedades = new Map();
   ctx.CacheService = { getScriptCache: () => ({
     put: (chave, valor) => cache.set(chave, valor),
     get: (chave) => cache.get(chave) || null
+  }) };
+  ctx.PropertiesService = { getScriptProperties: () => ({
+    getProperty: (chave) => propriedades.get(chave) || "",
+    setProperty: (chave, valor) => propriedades.set(chave, valor)
   }) };
   ctx.tentarPublicarEventoGiro({
     idGiro: "1234567890abcdef",
@@ -118,6 +123,13 @@ test("o evento da tela transmite o prêmio, mas nunca o nome da pessoa", () => {
   assert.equal(evento.premios.length, config.premios.length);
   assert.equal("nome" in evento, false);
   assert.doesNotMatch(JSON.stringify(evento), /Nome que não pode vazar/);
+
+  cache.clear();
+  const eventoRecuperado = JSON.parse(JSON.stringify(ctx.obterUltimoGiro("Comercial")));
+  assert.equal(eventoRecuperado.idGiro, "1234567890abcdef");
+  assert.equal(eventoRecuperado.premio.id, config.premios[0].id);
+  assert.equal("premios" in eventoRecuperado, false);
+  assert.doesNotMatch(JSON.stringify(eventoRecuperado), /Nome que não pode vazar/);
 });
 
 test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {

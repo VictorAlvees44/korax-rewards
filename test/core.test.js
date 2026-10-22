@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme, carregarHistorico, adicionarHistorico, CHAVE_HISTORICO } from "../core.js";
+import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme, carregarHistorico, adicionarHistorico, CHAVE_HISTORICO, normalizarChavePerfil, resolverNomePerfilDisponivel } from "../core.js";
 
 const config = JSON.parse(readFileSync(new URL("../config.json", import.meta.url), "utf8"));
 
@@ -13,6 +13,13 @@ test("a configuração associa os três sons aos eventos corretos", () => {
   assert.equal(config.sons.giro, "assets/audio/roleta-girando.mp3");
   assert.equal(config.sons.vitoria, "assets/audio/palmas.mp3");
   assert.equal(config.sons.derrota, "assets/audio/naruto-sad.mp3");
+});
+
+test("a URL antiga Comercial resolve o perfil ROLETA COMERCIAL da TV", () => {
+  assert.equal(normalizarChavePerfil("  Roleta Comércial  "), "comercial");
+  assert.equal(resolverNomePerfilDisponivel("Comercial", ["ROLETA COMERCIAL", "Feira"], "ROLETA COMERCIAL"), "ROLETA COMERCIAL");
+  assert.equal(resolverNomePerfilDisponivel("Feira", ["ROLETA COMERCIAL", "Feira"], "ROLETA COMERCIAL"), "Feira");
+  assert.equal(resolverNomePerfilDisponivel("Perfil removido", ["ROLETA COMERCIAL"], "ROLETA COMERCIAL"), "ROLETA COMERCIAL");
 });
 
 test("histórico local conserva somente nome e data, inclusive ao migrar registros antigos", () => {

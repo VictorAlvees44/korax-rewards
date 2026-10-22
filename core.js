@@ -35,6 +35,27 @@ export const Estado = {
   participanteAtual: ""
 };
 
+/**
+ * Compara nomes de perfil de forma tolerante para URLs antigas da TV.
+ * "Comercial" e "ROLETA COMERCIAL", por exemplo, apontam para o mesmo perfil.
+ */
+export function normalizarChavePerfil(valor) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/^roleta\s+/, "")
+    .replace(/\s+/g, " ");
+}
+
+export function resolverNomePerfilDisponivel(solicitado, perfis = [], ativo = "") {
+  const nomes = [...new Set([...(Array.isArray(perfis) ? perfis : []), ativo].map((nome) => String(nome || "").trim()).filter(Boolean))];
+  const chave = normalizarChavePerfil(solicitado);
+  const encontrado = chave ? nomes.find((nome) => normalizarChavePerfil(nome) === chave) : "";
+  return encontrado || (nomes.includes(ativo) ? ativo : nomes[0] || "");
+}
+
 /* ========================================================================
    URL DO BACKEND
    ======================================================================== */

@@ -106,10 +106,12 @@ Perfis antigos com cores iguais são corrigidos ao abrir no admin: os prêmios s
 
 Cadastre uma página web no painel `https://telas.telacorporativa.com.br/admin` usando uma URL de modo tela. Exemplos:
 
-- Comercial: `https://victoralvees44.github.io/korax-rewards/?modo=tela&perfil=Comercial`
+- Comercial: `https://victoralvees44.github.io/korax-rewards/?modo=tela&perfil=ROLETA%20COMERCIAL`
 - Feira: `https://victoralvees44.github.io/korax-rewards/?modo=tela&perfil=Feira`
 
 A tela deve permanecer aberta antes do giro. O notebook usa a URL pública normal, escolhe o mesmo perfil e realiza o giro. A página da Corporate Screen consulta somente o evento temporário daquele perfil e anima o mesmo prêmio. O modo tela não exibe controles de edição nem registra novamente o participante.
+
+URLs antigas como `perfil=Comercial` são resolvidas automaticamente para `ROLETA COMERCIAL`. O player também guarda localmente o último evento exibido e aceita eventos recentes depois de um recarregamento, evitando perder o giro durante a atualização de conteúdo da TV.
 
 ## Planilhas e idempotência
 

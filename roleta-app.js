@@ -10,17 +10,34 @@ import {
   obterConfigParaExibir, listarPerfisPublicosRemoto, buscarPerfilPublicoRemoto,
   buscarUltimoGiroRemoto, sortearGiroRemoto, gerarIdSeguro, girarRoleta,
   validarConfiguracao, adicionarHistorico, mostrarToast,
-  tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela
-} from "./core.js?v=20261021-tela";
+  tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela,
+  normalizarChavePerfil, resolverNomePerfilDisponivel
+} from "./core.js?v=20261022-tv2";
 
 const parametros = new URLSearchParams(location.search);
 const MODO_TELA = parametros.get("modo") === "tela";
 const PERFIL_DA_URL = String(parametros.get("perfil") || "").trim();
-const INICIO_DA_ESCUTA = Date.now();
+const JANELA_EVENTO_TELA_MS = 2 * 60 * 1000;
+const CHAVE_EVENTO_TELA = "korax_rewards_evento_tela_v1";
 
 let trocandoPerfil = false;
 let timerSincronizacao = 0;
 let ultimoEventoId = "";
+
+function chaveEventoVisto(nomePerfil) {
+  return `${CHAVE_EVENTO_TELA}:${normalizarChavePerfil(nomePerfil)}`;
+}
+
+function obterEventoVisto(nomePerfil) {
+  try { return localStorage.getItem(chaveEventoVisto(nomePerfil)) || ""; }
+  catch (ignorado) { return ""; }
+}
+
+function marcarEventoVisto(nomePerfil, idGiro) {
+  ultimoEventoId = idGiro;
+  try { localStorage.setItem(chaveEventoVisto(nomePerfil), idGiro); }
+  catch (ignorado) {}
+}
 
 function atualizarResumoPerfil() {
   const nome = Estado.nomePerfilAtivo || "Roleta principal";
@@ -271,16 +288,17 @@ function atualizarStatusTela(texto, conectado) {
 
 function iniciarSincronizacaoTela() {
   clearTimeout(timerSincronizacao);
+  ultimoEventoId = obterEventoVisto(Estado.nomePerfilAtivo);
   const consultar = async () => {
     try {
       const evento = await buscarUltimoGiroRemoto(Estado.nomePerfilAtivo);
       atualizarStatusTela(`Tela conectada • ${Estado.nomePerfilAtivo}`, true);
       if (evento?.idGiro && evento.idGiro !== ultimoEventoId) {
-        const primeiroEvento = !ultimoEventoId;
-        ultimoEventoId = evento.idGiro;
         const criadoEm = Date.parse(evento.criadoEm || "");
-        const aconteceuDepoisDeAbrir = Number.isFinite(criadoEm) && criadoEm >= INICIO_DA_ESCUTA - 2000;
-        if (!primeiroEvento || aconteceuDepoisDeAbrir) await executarGiroNaTela(evento);
+        const idade = Date.now() - criadoEm;
+        const eventoRecente = Number.isFinite(criadoEm) && idade >= -30000 && idade <= JANELA_EVENTO_TELA_MS;
+        marcarEventoVisto(Estado.nomePerfilAtivo, evento.idGiro);
+        if (eventoRecente) await executarGiroNaTela(evento);
       }
     } catch (erro) {
       atualizarStatusTela("Reconectando à roleta…", false);
@@ -327,7 +345,11 @@ async function iniciarAplicacao() {
   });
 
   if (MODO_TELA) {
-    const perfilTela = PERFIL_DA_URL || dadosPerfis?.ativo || Estado.nomePerfilAtivo;
+    const perfilTela = resolverNomePerfilDisponivel(
+      PERFIL_DA_URL,
+      perfis,
+      dadosPerfis?.ativo || Estado.nomePerfilAtivo
+    );
     const carregou = await selecionarPerfil(perfilTela, { silencioso: true });
     document.getElementById("btnGirar").disabled = true;
     document.getElementById("textoCentral").textContent = "AGUARDANDO";
