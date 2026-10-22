@@ -110,6 +110,8 @@ Na playlist da TV, cadastre uma página web com exatamente o mesmo link usado no
 
 Quando a Corporate Screen incorpora esse link na playlist, a página reconhece automaticamente o contexto de TV e aguarda os giros de qualquer perfil. No notebook, o mesmo endereço continua exibindo a escolha de perfil e o botão de giro. O perfil e o resultado sorteados no notebook são reproduzidos na TV sem registrar novamente o participante.
 
+Para o parque de TVs antigas da Korax, use na playlist o endereço `https://victoralvees44.github.io/korax-rewards/?modo=tela&legacy=1`. Esse modo carrega um receptor ES5 leve, compatível com os navegadores Samsung/LG antigos, sem alterar a experiência normal usada no notebook.
+
 A tela da playlist deve permanecer carregada antes do giro. O player guarda localmente o último evento exibido e aceita eventos recentes depois de um recarregamento, evitando perder o giro durante a atualização de conteúdo da TV. As URLs antigas com `?modo=tela` continuam compatíveis.
 
 ## Planilhas e idempotência

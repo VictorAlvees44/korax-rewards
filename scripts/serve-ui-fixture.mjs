@@ -26,9 +26,11 @@ const arquivos = new Map([
   ["/admin/index.html", ["admin/index.html", "text/html"]],
   ["/privacidade.html", ["privacidade.html", "text/html"]],
   ["/style.css", ["style.css", "text/css"]],
+  ["/legacy-tv.css", ["legacy-tv.css", "text/css"]],
   ["/config.js", ["config.js", "text/javascript"]],
   ["/core.js", ["core.js", "text/javascript"]],
   ["/roleta-app.js", ["roleta-app.js", "text/javascript"]],
+  ["/legacy-tv.js", ["legacy-tv.js", "text/javascript"]],
   ["/admin/admin-app.js", ["admin/admin-app.js", "text/javascript"]],
   ["/assets/audio/naruto-sad.mp3", ["assets/audio/naruto-sad.mp3", "audio/mpeg", true]],
   ["/assets/audio/palmas.mp3", ["assets/audio/palmas.mp3", "audio/mpeg", true]],
@@ -128,6 +130,10 @@ const servidor = createServer(async (req, res) => {
       conteudo = conteudo.replace(original, 'await fetch("/__test/backend" + new URL(url).search, { ...opcoes, signal: controlador.signal })');
     }
     if (arquivo[0] === "config.js") {
+      conteudo = conteudo.replace(
+        /url: "https:\/\/script\.google\.com\/macros\/s\/[^"]+"/,
+        'url: "http://127.0.0.1:43119/__test/backend"'
+      );
       conteudo = conteudo.replace(
         /authUrl: "https:\/\/script\.google\.com[^\"]+"/,
         'authUrl: "http://127.0.0.1:43119/__test/login"'

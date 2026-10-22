@@ -1,0 +1,25 @@
+/* Receptor simplificado para as TVs Samsung/LG antigas da Corporate Screen. */
+html, body.modo-tela-legado { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #070b14; color: #fff; }
+.modo-tela-legado .palco { position: relative; display: block; width: 100%; height: 100%; min-height: 0; overflow: hidden; background: #070b14; }
+.modo-tela-legado .palco__fundo { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-position: center; background-size: cover; opacity: .25; }
+.modo-tela-legado .topo { position: absolute; z-index: 2; top: 0; left: 0; width: 100%; height: 72px; min-height: 0; padding: 10px 24px; }
+.modo-tela-legado .topo__logo { width: 210px; max-height: 58px; }
+.modo-tela-legado .topo__nome-empresa { color: #fff; font: bold 21px Arial, sans-serif; }
+.modo-tela-legado .experiencia-roleta { position: absolute; z-index: 2; display: block; top: 72px; right: 0; bottom: 0; left: 0; width: auto; padding: 0; }
+.modo-tela-legado .centro-roleta { position: absolute; display: block; top: 0; right: 0; bottom: 0; left: 0; text-align: center; }
+.modo-tela-legado .topo__titulo { display: block; margin: 0 auto 4px; color: #e8c766; font: bold 24px Arial, sans-serif; text-align: center; }
+.modo-tela-legado .status-tela { display: block; height: 20px; margin: 0 auto 4px; color: #ffcf9f; font: bold 13px Arial, sans-serif; text-align: center; }
+.modo-tela-legado .status-tela--conectado { color: #79d7ad; }
+.modo-tela-legado .arena { position: relative; display: block; width: 100%; padding: 0; text-align: center; }
+.modo-tela-legado .arena__roleta-wrap { position: relative; display: inline-block; margin: 0 auto; }
+.modo-tela-legado #canvasRoleta { display: block; width: 100%; height: 100%; }
+.modo-tela-legado .cubo-central { position: absolute; display: block; left: 38%; top: 38%; width: 24%; height: 24%; padding: 0; border-radius: 50%; background: #c9a227; color: #14100a; font: bold 13px Arial, sans-serif; text-align: center; }
+.modo-tela-legado .cubo-central__logo { position: absolute; left: 11%; top: 11%; width: 78%; height: 78%; }
+.modo-tela-legado #textoCentral { display: block; position: absolute; top: 45%; width: 100%; text-align: center; }
+.modo-tela-legado .ponteiro { top: -4px; border-top-color: #e8c766; }
+.modo-tela-legado .menu-perfis, .modo-tela-legado .perfil-selecionado, .modo-tela-legado #btnTelaCheia { display: none; }
+.resultado-legado { position: fixed; z-index: 1000; display: none; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0,0,0,.78); text-align: center; }
+.resultado-legado__caixa { position: absolute; left: 20%; top: 22%; width: 60%; padding: 34px 20px; border: 2px solid #c9a227; border-radius: 18px; background: #0b1220; color: #fff; }
+.resultado-legado__selo { margin: 0 auto 18px; color: #e8c766; font: bold 70px Arial, sans-serif; }
+.resultado-legado__premio { color: #e8c766; font: bold 42px Arial, sans-serif; }
+.resultado-legado__descricao { margin-top: 14px; color: #fff; font: 22px Arial, sans-serif; }

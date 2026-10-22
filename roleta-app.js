@@ -12,9 +12,10 @@ import {
   validarConfiguracao, adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela,
   normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela
-} from "./core.js?v=20261022-tv3";
+} from "./core.js?v=20261022-tv4";
 
 const parametros = new URLSearchParams(location.search);
+const FORCAR_MODO_LEGADO = parametros.get("legacy") === "1";
 const MODO_TELA = deveUsarModoTela({
   modo: parametros.get("modo") || "",
   incorporado: window.self !== window.top,
@@ -379,4 +380,6 @@ async function iniciarAplicacao() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", iniciarAplicacao);
+// TVs corporativas antigas usam o receptor ES5 dedicado. O modulo ainda pode
+// ser baixado por navegadores intermediarios, mas nao disputa o mesmo DOM.
+if (!FORCAR_MODO_LEGADO) document.addEventListener("DOMContentLoaded", iniciarAplicacao);
