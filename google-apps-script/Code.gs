@@ -18,6 +18,8 @@ var TAMANHO_MAX_REQUISICAO = 8 * 1024 * 1024;
 var LIMITE_GIROS_JANELA = 20;
 var SEGUNDOS_JANELA_GIROS = 300;
 var SEGUNDOS_EVENTO_TELA = 600;
+var CHAVE_EVENTO_TELA_GLOBAL = "tela_global_v1";
+var CHAVE_EVENTO_PERSISTENTE_GLOBAL = "evento_tela_global_v1";
 var SEGUNDOS_SESSAO_ADMIN = 8 * 60 * 60;
 var DOMINIO_WORKSPACE_ADMIN = "koraxbrasil.com.br";
 var URL_RETORNO_ADMIN = "https://victoralvees44.github.io/korax-rewards/admin/";
@@ -369,28 +371,36 @@ function tentarPublicarEventoGiro(resultado) {
       premios: resultado.premios,
       criadoEm: criadoEm
     };
-    CacheService.getScriptCache().put(chaveEventoPerfil(resultado.perfil), JSON.stringify(evento), SEGUNDOS_EVENTO_TELA);
+    var cache = CacheService.getScriptCache();
+    var eventoCompleto = JSON.stringify(evento);
+    cache.put(chaveEventoPerfil(resultado.perfil), eventoCompleto, SEGUNDOS_EVENTO_TELA);
+    cache.put(CHAVE_EVENTO_TELA_GLOBAL, eventoCompleto, SEGUNDOS_EVENTO_TELA);
     // O CacheService pode descartar entradas antes do prazo. Mantemos uma cópia
     // mínima e temporariamente válida para a TV não perder o giro.
-    PropertiesService.getScriptProperties().setProperty(chaveEventoPersistentePerfil(resultado.perfil), JSON.stringify({
+    var eventoMinimo = JSON.stringify({
       idGiro: resultado.idGiro,
       perfil: resultado.perfil,
       premio: resultado.premio,
       criadoEm: criadoEm
-    }));
+    });
+    var propriedades = PropertiesService.getScriptProperties();
+    propriedades.setProperty(chaveEventoPersistentePerfil(resultado.perfil), eventoMinimo);
+    propriedades.setProperty(CHAVE_EVENTO_PERSISTENTE_GLOBAL, eventoMinimo);
   } catch (erro) {
     console.warn("Falha ao transmitir o giro para a tela: " + String(erro.message || erro).substring(0, 160));
   }
 }
 
 function obterUltimoGiro(nomePerfil) {
-  var nome = validarNomePerfil(nomePerfil);
-  var texto = CacheService.getScriptCache().get(chaveEventoPerfil(nome));
-  if (!texto) texto = PropertiesService.getScriptProperties().getProperty(chaveEventoPersistentePerfil(nome));
+  var nome = normalizarTexto(nomePerfil || "", "nome do perfil", 80, false);
+  var chaveCache = nome ? chaveEventoPerfil(nome) : CHAVE_EVENTO_TELA_GLOBAL;
+  var chavePersistente = nome ? chaveEventoPersistentePerfil(nome) : CHAVE_EVENTO_PERSISTENTE_GLOBAL;
+  var texto = CacheService.getScriptCache().get(chaveCache);
+  if (!texto) texto = PropertiesService.getScriptProperties().getProperty(chavePersistente);
   if (!texto) return null;
   try {
     var evento = JSON.parse(texto);
-    if (!evento || evento.perfil !== nome || !evento.idGiro || !evento.premio) return null;
+    if (!evento || (nome && evento.perfil !== nome) || !evento.idGiro || !evento.perfil || !evento.premio) return null;
     var criadoEm = new Date(evento.criadoEm).getTime();
     if (!isFinite(criadoEm) || Date.now() - criadoEm > SEGUNDOS_EVENTO_TELA * 1000) return null;
     return evento;

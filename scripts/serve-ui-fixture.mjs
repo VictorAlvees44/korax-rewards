@@ -18,6 +18,7 @@ const perfis = new Map([["Comercial", inicial], ["Feira", alternativo]]);
 let ativo = { nome: "Comercial", config: structuredClone(inicial) };
 let numeroGiroFicticio = 0;
 const ultimoEventoPorPerfil = new Map();
+let ultimoEventoGlobal = null;
 const arquivos = new Map([
   ["/", ["index.html", "text/html"]],
   ["/index.html", ["index.html", "text/html"]],
@@ -64,7 +65,8 @@ const servidor = createServer(async (req, res) => {
         return;
       }
       if (req.method === "GET" && url.searchParams.get("acao") === "ultimoGiro") {
-        responder({ status: "sucesso", dados: ultimoEventoPorPerfil.get(url.searchParams.get("perfil")) || null });
+        const perfil = url.searchParams.get("perfil") || "";
+        responder({ status: "sucesso", dados: perfil ? ultimoEventoPorPerfil.get(perfil) || null : ultimoEventoGlobal });
         return;
       }
       let corpo = "";
@@ -77,13 +79,15 @@ const servidor = createServer(async (req, res) => {
         const nomePerfil = dados.perfil && perfis.has(dados.perfil) ? dados.perfil : ativo.nome;
         const configPerfil = perfis.get(nomePerfil) || ativo.config;
         const premio = configPerfil.premios[numeroGiroFicticio++ % configPerfil.premios.length];
-        ultimoEventoPorPerfil.set(nomePerfil, {
+        const evento = {
           idGiro: dados.idGiro,
           perfil: nomePerfil,
           premio,
           premios: configPerfil.premios,
           criadoEm: new Date().toISOString()
-        });
+        };
+        ultimoEventoPorPerfil.set(nomePerfil, evento);
+        ultimoEventoGlobal = evento;
         responder({
           status: "sucesso",
           dados: {

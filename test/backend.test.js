@@ -124,12 +124,17 @@ test("o evento da tela transmite o prêmio, mas nunca o nome da pessoa", () => {
   assert.equal("nome" in evento, false);
   assert.doesNotMatch(JSON.stringify(evento), /Nome que não pode vazar/);
 
+  const eventoGlobal = JSON.parse(JSON.stringify(ctx.obterUltimoGiro("")));
+  assert.equal(eventoGlobal.idGiro, "1234567890abcdef");
+  assert.equal(eventoGlobal.perfil, "Comercial");
+
   cache.clear();
   const eventoRecuperado = JSON.parse(JSON.stringify(ctx.obterUltimoGiro("Comercial")));
   assert.equal(eventoRecuperado.idGiro, "1234567890abcdef");
   assert.equal(eventoRecuperado.premio.id, config.premios[0].id);
   assert.equal("premios" in eventoRecuperado, false);
   assert.doesNotMatch(JSON.stringify(eventoRecuperado), /Nome que não pode vazar/);
+  assert.equal(ctx.obterUltimoGiro("").idGiro, "1234567890abcdef");
 });
 
 test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {

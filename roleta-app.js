@@ -2,8 +2,8 @@
  * Tela pública da roleta.
  *
  * Modo normal: escolhe um perfil, pede o nome e inicia o giro.
- * Modo tela: use ?modo=tela&perfil=Comercial no player da Corporate Screen;
- * a página acompanha os giros iniciados em outro computador.
+ * Na Corporate Screen, a mesma URL pública reconhece que está incorporada e
+ * acompanha os giros iniciados no notebook.
  */
 import {
   Estado, Roleta, Confete,
@@ -11,11 +11,15 @@ import {
   buscarUltimoGiroRemoto, sortearGiroRemoto, gerarIdSeguro, girarRoleta,
   validarConfiguracao, adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela,
-  normalizarChavePerfil, resolverNomePerfilDisponivel
-} from "./core.js?v=20261022-tv2";
+  normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela
+} from "./core.js?v=20261022-tv3";
 
 const parametros = new URLSearchParams(location.search);
-const MODO_TELA = parametros.get("modo") === "tela";
+const MODO_TELA = deveUsarModoTela({
+  modo: parametros.get("modo") || "",
+  incorporado: window.self !== window.top,
+  referenciador: document.referrer
+});
 const PERFIL_DA_URL = String(parametros.get("perfil") || "").trim();
 const JANELA_EVENTO_TELA_MS = 2 * 60 * 1000;
 const CHAVE_EVENTO_TELA = "korax_rewards_evento_tela_v1";
@@ -267,7 +271,11 @@ function finalizarGiroLocal(registro) {
 }
 
 async function executarGiroNaTela(evento) {
-  if (Estado.girando || !evento?.premio || evento.perfil !== Estado.nomePerfilAtivo) return;
+  if (Estado.girando || !evento?.premio || !evento?.perfil) return;
+  if (evento.perfil !== Estado.nomePerfilAtivo) {
+    const carregou = await selecionarPerfil(evento.perfil, { silencioso: true });
+    if (!carregou) return;
+  }
   Estado.girando = true;
   prepararRoletaParaResultado({ premio: evento.premio, premios: evento.premios, perfil: evento.perfil });
   tocarSom("audioGiro");
@@ -288,16 +296,18 @@ function atualizarStatusTela(texto, conectado) {
 
 function iniciarSincronizacaoTela() {
   clearTimeout(timerSincronizacao);
-  ultimoEventoId = obterEventoVisto(Estado.nomePerfilAtivo);
+  const perfilFixo = Boolean(PERFIL_DA_URL);
+  const canal = perfilFixo ? Estado.nomePerfilAtivo : "todos-os-perfis";
+  ultimoEventoId = obterEventoVisto(canal);
   const consultar = async () => {
     try {
-      const evento = await buscarUltimoGiroRemoto(Estado.nomePerfilAtivo);
+      const evento = await buscarUltimoGiroRemoto(perfilFixo ? Estado.nomePerfilAtivo : "");
       atualizarStatusTela(`Tela conectada • ${Estado.nomePerfilAtivo}`, true);
       if (evento?.idGiro && evento.idGiro !== ultimoEventoId) {
         const criadoEm = Date.parse(evento.criadoEm || "");
         const idade = Date.now() - criadoEm;
         const eventoRecente = Number.isFinite(criadoEm) && idade >= -30000 && idade <= JANELA_EVENTO_TELA_MS;
-        marcarEventoVisto(Estado.nomePerfilAtivo, evento.idGiro);
+        marcarEventoVisto(canal, evento.idGiro);
         if (eventoRecente) await executarGiroNaTela(evento);
       }
     } catch (erro) {

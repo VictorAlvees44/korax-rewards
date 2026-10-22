@@ -56,6 +56,17 @@ export function resolverNomePerfilDisponivel(solicitado, perfis = [], ativo = ""
   return encontrado || (nomes.includes(ativo) ? ativo : nomes[0] || "");
 }
 
+/** A Corporate Screen incorpora a página; nesse contexto a mesma URL vira uma tela receptora. */
+export function deveUsarModoTela({ modo = "", incorporado = false, referenciador = "" } = {}) {
+  if (String(modo).toLowerCase() === "tela" || incorporado) return true;
+  try {
+    const host = new URL(String(referenciador || "")).hostname.toLowerCase();
+    return host === "telacorporativa.com.br" || host.endsWith(".telacorporativa.com.br");
+  } catch (ignorado) {
+    return false;
+  }
+}
+
 /* ========================================================================
    URL DO BACKEND
    ======================================================================== */

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme, carregarHistorico, adicionarHistorico, CHAVE_HISTORICO, normalizarChavePerfil, resolverNomePerfilDisponivel } from "../core.js";
+import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme, carregarHistorico, adicionarHistorico, CHAVE_HISTORICO, normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela } from "../core.js";
 
 const config = JSON.parse(readFileSync(new URL("../config.json", import.meta.url), "utf8"));
 
@@ -20,6 +20,13 @@ test("a URL antiga Comercial resolve o perfil ROLETA COMERCIAL da TV", () => {
   assert.equal(resolverNomePerfilDisponivel("Comercial", ["ROLETA COMERCIAL", "Feira"], "ROLETA COMERCIAL"), "ROLETA COMERCIAL");
   assert.equal(resolverNomePerfilDisponivel("Feira", ["ROLETA COMERCIAL", "Feira"], "ROLETA COMERCIAL"), "Feira");
   assert.equal(resolverNomePerfilDisponivel("Perfil removido", ["ROLETA COMERCIAL"], "ROLETA COMERCIAL"), "ROLETA COMERCIAL");
+});
+
+test("a mesma URL entra automaticamente em modo tela quando incorporada pela Corporate Screen", () => {
+  assert.equal(deveUsarModoTela({ incorporado: true }), true);
+  assert.equal(deveUsarModoTela({ referenciador: "https://telas.telacorporativa.com.br/player/123" }), true);
+  assert.equal(deveUsarModoTela({ referenciador: "https://exemplo.com/" }), false);
+  assert.equal(deveUsarModoTela({ modo: "tela" }), true);
 });
 
 test("histórico local conserva somente nome e data, inclusive ao migrar registros antigos", () => {
