@@ -40,3 +40,15 @@ test("o receptor legado evita sintaxe JavaScript moderna incompativel com as TVs
   assert.doesNotMatch(legacy, /\b(?:const|let|class|async|await)\s+[A-Za-z_$]/);
   assert.doesNotMatch(legacy, /=>|\?\.|`/);
 });
+
+test("o receptor legado usa SVG e audios absolutos para o proxy da TV", () => {
+  assert.match(legacy, /createElementNS\("http:\/\/www\.w3\.org\/2000\/svg", name\)/);
+  assert.match(legacy, /roletaLegadaSvg/);
+  assert.match(legacy, /byId\("roletaLegadaSvg"\) \|\| byId\("canvasRoleta"\)/);
+  assert.match(legacy, /context\.moveTo\(0, 0\)/);
+  assert.match(legacy, /https:\/\/victoralvees44\.github\.io\/korax-rewards\//);
+  assert.match(legacy, /assets\/audio\/roleta-girando\.mp3/);
+  assert.match(legacy, /assets\/audio\/palmas\.mp3/);
+  assert.match(legacy, /assets\/audio\/naruto-sad\.mp3/);
+  assert.match(legacy, /playAudio\(selected\.positivo === false \? "audioDerrota" : "audioVitoria"\)/);
+});

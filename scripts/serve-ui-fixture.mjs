@@ -140,6 +140,9 @@ const servidor = createServer(async (req, res) => {
       );
     }
     if (arquivo[1] === "text/html") {
+      // Em produção os recursos são absolutos para sobreviver ao proxy da TV.
+      // No QA, convertemos somente a resposta para testar os arquivos locais.
+      conteudo = conteudo.replaceAll("https://victoralvees44.github.io/korax-rewards/", "/");
       conteudo = conteudo.replace("<body>", '<body><p role="note" style="background:#fff;color:#111;padding:12px;text-align:center">TESTE LOCAL — dados fictícios, sem Google ou registros reais</p>');
       conteudo = conteudo.replace("connect-src 'self' https://script.google.com https://script.googleusercontent.com", "connect-src 'self'");
     }

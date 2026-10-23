@@ -114,6 +114,8 @@ O mesmo endereço também reconhece automaticamente navegadores antigos de TVs S
 
 Os arquivos essenciais da tela usam URLs absolutas. Isso permite que a roleta continue carregando quando a Corporate Screen apresenta a página por meio do próprio domínio em vez de navegar diretamente no GitHub Pages.
 
+O receptor compatível desenha a roleta em SVG para evitar falhas de Canvas em navegadores antigos de Smart TVs. Ele também tenta reproduzir o som do giro e, ao final, palmas ou o áudio negativo. A TV só emitirá áudio se o player da Corporate Screen e a política de reprodução automática do navegador permitirem som em páginas web.
+
 A tela da playlist deve permanecer carregada antes do giro. O player guarda localmente o último evento exibido e aceita eventos recentes depois de um recarregamento, evitando perder o giro durante a atualização de conteúdo da TV. As URLs antigas com `?modo=tela` continuam compatíveis.
 
 ## Planilhas e idempotência
