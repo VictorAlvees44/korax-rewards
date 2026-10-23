@@ -487,6 +487,22 @@
     return prize;
   }
 
+  function synchronizedDelay(event) {
+    var startAt = Number(event && event.iniciarEm);
+    if (!isFinite(startAt) || startAt <= 0) return 0;
+    var serverReceivedAt = Number(event.servidorRecebeuEm);
+    var serverNow = Number(event.servidorAgora);
+    var sentAt = Number(event.clienteEnviadoEm);
+    var receivedAt = Number(event.clienteRecebidoEm);
+    var clockDifference = 0;
+    if (isFinite(serverReceivedAt) && serverReceivedAt > 0 && isFinite(serverNow) && serverNow >= serverReceivedAt && isFinite(sentAt) && isFinite(receivedAt) && receivedAt >= sentAt) {
+      clockDifference = ((serverReceivedAt - sentAt) + (serverNow - receivedAt)) / 2;
+    } else if (isFinite(serverNow) && serverNow > 0 && isFinite(sentAt) && isFinite(receivedAt) && receivedAt >= sentAt) {
+      clockDifference = serverNow - ((sentAt + receivedAt) / 2);
+    }
+    return Math.max(0, Math.min(10000, Math.round(startAt - clockDifference - new Date().getTime())));
+  }
+
   function runEvent(event) {
     if (!event || !event.premio || !event.perfil || state.spinning) return;
     function start() {
@@ -495,15 +511,19 @@
       var selected = findPrize(event.premio, state.config.premios || configPrizes);
       drawWheel(state.angle);
       state.spinning = true;
-      stopAudio("audioVitoria");
-      stopAudio("audioDerrota");
-      playAudio("audioGiro");
-      animateSpin(selected, function () {
-        stopAudio("audioGiro");
-        playAudio(selected.positivo === false ? "audioDerrota" : "audioVitoria");
-        showResult(selected);
-        state.spinning = false;
-      });
+      var delay = synchronizedDelay(event);
+      if (delay > 0) setStatus("Giro sincronizado - " + escapeHtml(state.profile), true);
+      window.setTimeout(function () {
+        stopAudio("audioVitoria");
+        stopAudio("audioDerrota");
+        playAudio("audioGiro");
+        animateSpin(selected, function () {
+          stopAudio("audioGiro");
+          playAudio(selected.positivo === false ? "audioDerrota" : "audioVitoria");
+          showResult(selected);
+          state.spinning = false;
+        });
+      }, delay);
     }
     if (String(event.perfil) === String(state.profile)) return start();
     request("perfilPublico", { nome: event.perfil }, function (error, payload) {
@@ -524,16 +544,22 @@
 
   function poll() {
     window.clearTimeout(state.pollTimer);
+    var requestedAt = new Date().getTime();
     request("ultimoGiro", { perfil: query.perfil || "" }, function (error, payload) {
       if (error) {
         setStatus("Reconectando a roleta...", false);
       } else {
         setStatus("Tela conectada - " + escapeHtml(state.profile), true);
         var event = payload.dados;
-        if (event && event.idGiro && String(event.idGiro) !== state.lastEventId) {
+        var eventId = event && String(event.idEvento || event.idGiro || "");
+        if (event && eventId && eventId !== state.lastEventId) {
           var createdAt = Date.parse(event.criadoEm || "");
           var age = new Date().getTime() - createdAt;
-          rememberEvent(event.idGiro);
+          event.servidorRecebeuEm = Number(payload.servidorRecebeuEm) || 0;
+          event.servidorAgora = Number(payload.servidorAgora) || 0;
+          event.clienteEnviadoEm = requestedAt;
+          event.clienteRecebidoEm = new Date().getTime();
+          rememberEvent(eventId);
           if (!isNaN(createdAt) && age >= -30000 && age <= EVENT_WINDOW_MS) runEvent(event);
         }
       }

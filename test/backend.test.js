@@ -121,8 +121,20 @@ test("o evento da tela transmite o prêmio, mas nunca o nome da pessoa", () => {
   assert.equal(evento.idGiro, "1234567890abcdef");
   assert.equal(evento.premio.id, config.premios[0].id);
   assert.equal(evento.premios.length, config.premios.length);
+  assert.equal(evento.iniciarEm - Date.parse(evento.criadoEm), 4000);
+  assert.equal(evento.idEvento, `${evento.idGiro}_${evento.iniciarEm}`);
   assert.equal("nome" in evento, false);
   assert.doesNotMatch(JSON.stringify(evento), /Nome que não pode vazar/);
+
+  const repetidoAntesDoInicio = JSON.parse(JSON.stringify(ctx.tentarPublicarEventoGiro({
+    idGiro: "1234567890abcdef",
+    nome: "Outro nome que não pode vazar",
+    perfil: "Comercial",
+    premio: config.premios[0],
+    premios: config.premios
+  })));
+  assert.equal(repetidoAntesDoInicio.idEvento, evento.idEvento);
+  assert.equal(repetidoAntesDoInicio.iniciarEm, evento.iniciarEm);
 
   const eventoGlobal = JSON.parse(JSON.stringify(ctx.obterUltimoGiro("")));
   assert.equal(eventoGlobal.idGiro, "1234567890abcdef");
@@ -132,6 +144,8 @@ test("o evento da tela transmite o prêmio, mas nunca o nome da pessoa", () => {
   const eventoRecuperado = JSON.parse(JSON.stringify(ctx.obterUltimoGiro("Comercial")));
   assert.equal(eventoRecuperado.idGiro, "1234567890abcdef");
   assert.equal(eventoRecuperado.premio.id, config.premios[0].id);
+  assert.equal(eventoRecuperado.iniciarEm, evento.iniciarEm);
+  assert.equal(eventoRecuperado.idEvento, evento.idEvento);
   assert.equal("premios" in eventoRecuperado, false);
   assert.doesNotMatch(JSON.stringify(eventoRecuperado), /Nome que não pode vazar/);
   assert.equal(ctx.obterUltimoGiro("").idGiro, "1234567890abcdef");

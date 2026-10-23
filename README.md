@@ -110,6 +110,8 @@ Na playlist da TV, cadastre uma página web com exatamente o mesmo link usado no
 
 Quando a Corporate Screen incorpora esse link na playlist, a página reconhece automaticamente o contexto de TV e aguarda os giros de qualquer perfil. No notebook, o mesmo endereço continua exibindo a escolha de perfil e o botão de giro. O perfil e o resultado sorteados no notebook são reproduzidos na TV sem registrar novamente o participante.
 
+Cada giro recebe do servidor um horário único quatro segundos à frente. Notebook e todas as TVs corrigem a diferença de relógio pela resposta do servidor e aguardam esse mesmo instante antes de animar. Assim, telas conectadas começam juntas mesmo que uma delas receba o evento alguns milissegundos antes da outra. Uma tela que estiver offline ou receber o evento somente depois do horário inicia assim que reconectar.
+
 O mesmo endereço também reconhece automaticamente navegadores antigos de TVs Samsung/LG e carrega um receptor ES5 leve. Não é necessário cadastrar um link diferente nem acrescentar parâmetros na playlist.
 
 Os arquivos essenciais da tela usam URLs absolutas. Isso permite que a roleta continue carregando quando a Corporate Screen apresenta a página por meio do próprio domínio em vez de navegar diretamente no GitHub Pages.

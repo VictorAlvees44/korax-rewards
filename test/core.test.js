@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme, carregarHistorico, adicionarHistorico, CHAVE_HISTORICO, normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela } from "../core.js";
+import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme, carregarHistorico, adicionarHistorico, CHAVE_HISTORICO, normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela, calcularAtrasoSincronizado } from "../core.js";
 
 const config = JSON.parse(readFileSync(new URL("../config.json", import.meta.url), "utf8"));
 
@@ -27,6 +27,28 @@ test("a mesma URL entra automaticamente em modo tela quando incorporada pela Cor
   assert.equal(deveUsarModoTela({ referenciador: "https://telas.telacorporativa.com.br/player/123" }), true);
   assert.equal(deveUsarModoTela({ referenciador: "https://exemplo.com/" }), false);
   assert.equal(deveUsarModoTela({ modo: "tela" }), true);
+});
+
+test("notebook e TVs convertem o horário do servidor para o mesmo instante local", () => {
+  const notebook = {
+    iniciarEm: 104000,
+    servidorRecebeuEm: 99600,
+    servidorAgora: 99900,
+    clienteEnviadoEm: 98000,
+    clienteRecebidoEm: 98500
+  };
+  const tv = {
+    iniciarEm: 104000,
+    servidorRecebeuEm: 100100,
+    servidorAgora: 100200,
+    clienteEnviadoEm: 102000,
+    clienteRecebidoEm: 102300
+  };
+  // Apesar dos relógios e latências diferentes, os dois aguardam 3,5 s.
+  assert.equal(calcularAtrasoSincronizado(notebook, 99000), 3500);
+  assert.equal(calcularAtrasoSincronizado(tv, 102500), 3500);
+  assert.equal(calcularAtrasoSincronizado({ iniciarEm: 90000 }, 100000), 0);
+  assert.equal(calcularAtrasoSincronizado({}, 100000), 0);
 });
 
 test("histórico local conserva somente nome e data, inclusive ao migrar registros antigos", () => {

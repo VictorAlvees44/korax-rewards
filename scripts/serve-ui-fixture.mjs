@@ -38,6 +38,7 @@ const arquivos = new Map([
 ]);
 
 const servidor = createServer(async (req, res) => {
+  const servidorRecebeuEm = Date.now();
   res.setHeader("Cache-Control", "no-store");
   const responder = (dados) => {
     res.setHeader("Content-Type", "application/json;charset=utf-8");
@@ -68,7 +69,7 @@ const servidor = createServer(async (req, res) => {
       }
       if (req.method === "GET" && url.searchParams.get("acao") === "ultimoGiro") {
         const perfil = url.searchParams.get("perfil") || "";
-        responder({ status: "sucesso", dados: perfil ? ultimoEventoPorPerfil.get(perfil) || null : ultimoEventoGlobal });
+        responder({ status: "sucesso", dados: perfil ? ultimoEventoPorPerfil.get(perfil) || null : ultimoEventoGlobal, servidorRecebeuEm, servidorAgora: Date.now() });
         return;
       }
       let corpo = "";
@@ -81,12 +82,16 @@ const servidor = createServer(async (req, res) => {
         const nomePerfil = dados.perfil && perfis.has(dados.perfil) ? dados.perfil : ativo.nome;
         const configPerfil = perfis.get(nomePerfil) || ativo.config;
         const premio = configPerfil.premios[numeroGiroFicticio++ % configPerfil.premios.length];
+        const criadoEmMs = Date.now();
+        const iniciarEm = criadoEmMs + 4000;
         const evento = {
           idGiro: dados.idGiro,
+          idEvento: `${dados.idGiro}_${iniciarEm}`,
           perfil: nomePerfil,
           premio,
           premios: configPerfil.premios,
-          criadoEm: new Date().toISOString()
+          criadoEm: new Date(criadoEmMs).toISOString(),
+          iniciarEm
         };
         ultimoEventoPorPerfil.set(nomePerfil, evento);
         ultimoEventoGlobal = evento;
@@ -98,8 +103,13 @@ const servidor = createServer(async (req, res) => {
             perfil: nomePerfil,
             premio,
             premios: configPerfil.premios,
-            data: "15/09/2026"
-          }
+            data: "15/09/2026",
+            idEvento: evento.idEvento,
+            criadoEm: evento.criadoEm,
+            iniciarEm
+          },
+          servidorRecebeuEm,
+          servidorAgora: Date.now()
         });
         return;
       }

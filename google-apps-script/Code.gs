@@ -18,6 +18,7 @@ var TAMANHO_MAX_REQUISICAO = 8 * 1024 * 1024;
 var LIMITE_GIROS_JANELA = 20;
 var SEGUNDOS_JANELA_GIROS = 300;
 var SEGUNDOS_EVENTO_TELA = 600;
+var ATRASO_INICIO_GIRO_MS = 4000;
 var CHAVE_EVENTO_TELA_GLOBAL = "tela_global_v1";
 var CHAVE_EVENTO_PERSISTENTE_GLOBAL = "evento_tela_global_v1";
 var SEGUNDOS_SESSAO_ADMIN = 8 * 60 * 60;
@@ -32,13 +33,14 @@ var SONS_FIXOS = {
 };
 
 function doGet(e) {
+  var servidorRecebeuEm = Date.now();
   try {
     var acao = (e && e.parameter && e.parameter.acao) || "saude";
     if (acao === "loginAdmin") return criarPaginaLoginAdmin();
     if (acao === "configAtivo") return respostaJson({ status: "sucesso", dados: obterConfigAtivo() });
     if (acao === "perfisPublicos") return respostaJson(listarPerfisPublicos());
     if (acao === "perfilPublico") return respostaJson({ status: "sucesso", dados: obterPerfilPublico(e.parameter.nome) });
-    if (acao === "ultimoGiro") return respostaJson({ status: "sucesso", dados: obterUltimoGiro(e.parameter.perfil) });
+    if (acao === "ultimoGiro") return respostaJson({ status: "sucesso", dados: obterUltimoGiro(e.parameter.perfil), servidorRecebeuEm: servidorRecebeuEm, servidorAgora: Date.now() });
     if (acao === "saude") {
       var props = PropertiesService.getScriptProperties();
       return respostaJson({
@@ -54,13 +56,19 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  var servidorRecebeuEm = Date.now();
   try {
     if (!e || !e.postData || !e.postData.contents) throw new Error("Nenhum dado recebido na requisição.");
     if (e.postData.contents.length > TAMANHO_MAX_REQUISICAO) throw new Error("Requisição excede o limite de 8 MB.");
     var corpo = JSON.parse(e.postData.contents);
     var acao = String(corpo.acao || "");
 
-    if (acao === "sortearGiro") return respostaJson(sortearERegistrarGiro(corpo));
+    if (acao === "sortearGiro") {
+      var respostaGiro = sortearERegistrarGiro(corpo);
+      respostaGiro.servidorRecebeuEm = servidorRecebeuEm;
+      respostaGiro.servidorAgora = Date.now();
+      return respostaJson(respostaGiro);
+    }
     if (acao === "autenticarAdmin") {
       exigirAdmin(corpo.adminToken);
       return respostaJson({ status: "sucesso" });
@@ -324,7 +332,12 @@ function sortearERegistrarGiro(corpo) {
     var existente = buscarGiroNoControle(idGiro);
     if (existente) {
       var repetido = respostaGiroExistente(existente, nome);
-      tentarPublicarEventoGiro(repetido.dados);
+      var eventoRepetido = tentarPublicarEventoGiro(repetido.dados);
+      if (eventoRepetido) {
+        repetido.dados.idEvento = eventoRepetido.idEvento;
+        repetido.dados.criadoEm = eventoRepetido.criadoEm;
+        repetido.dados.iniciarEm = eventoRepetido.iniciarEm;
+      }
       return repetido;
     }
 
@@ -348,11 +361,18 @@ function sortearERegistrarGiro(corpo) {
     lock.releaseLock();
   }
 
-  tentarPublicarEventoGiro(resultado);
   try {
     enviarEmailNotificacao(resultado);
   } catch (erroEmail) {
     console.warn("Falha no e-mail administrativo: " + String(erroEmail.message || erroEmail).substring(0, 160));
+  }
+  // O evento é publicado por último para que notebook e TVs recebam tempo
+  // suficiente para aguardar o mesmo instante de início.
+  var evento = tentarPublicarEventoGiro(resultado);
+  if (evento) {
+    resultado.idEvento = evento.idEvento;
+    resultado.criadoEm = evento.criadoEm;
+    resultado.iniciarEm = evento.iniciarEm;
   }
   return { status: "sucesso", dados: resultado };
 }
@@ -363,13 +383,19 @@ function sortearERegistrarGiro(corpo) {
  */
 function tentarPublicarEventoGiro(resultado) {
   try {
-    var criadoEm = new Date().toISOString();
+    var agoraMs = Date.now();
+    var anterior = obterUltimoGiro(resultado.perfil);
+    var reutilizarAnterior = anterior && anterior.idGiro === resultado.idGiro && isFinite(Number(anterior.iniciarEm)) && Number(anterior.iniciarEm) > agoraMs + 500;
+    var criadoEm = reutilizarAnterior ? anterior.criadoEm : new Date(agoraMs).toISOString();
+    var iniciarEm = reutilizarAnterior ? Number(anterior.iniciarEm) : agoraMs + ATRASO_INICIO_GIRO_MS;
     var evento = {
       idGiro: resultado.idGiro,
+      idEvento: resultado.idGiro + "_" + iniciarEm,
       perfil: resultado.perfil,
       premio: resultado.premio,
       premios: resultado.premios,
-      criadoEm: criadoEm
+      criadoEm: criadoEm,
+      iniciarEm: iniciarEm
     };
     var cache = CacheService.getScriptCache();
     var eventoCompleto = JSON.stringify(evento);
@@ -379,15 +405,19 @@ function tentarPublicarEventoGiro(resultado) {
     // mínima e temporariamente válida para a TV não perder o giro.
     var eventoMinimo = JSON.stringify({
       idGiro: resultado.idGiro,
+      idEvento: evento.idEvento,
       perfil: resultado.perfil,
       premio: resultado.premio,
-      criadoEm: criadoEm
+      criadoEm: criadoEm,
+      iniciarEm: iniciarEm
     });
     var propriedades = PropertiesService.getScriptProperties();
     propriedades.setProperty(chaveEventoPersistentePerfil(resultado.perfil), eventoMinimo);
     propriedades.setProperty(CHAVE_EVENTO_PERSISTENTE_GLOBAL, eventoMinimo);
+    return evento;
   } catch (erro) {
     console.warn("Falha ao transmitir o giro para a tela: " + String(erro.message || erro).substring(0, 160));
+    return null;
   }
 }
 

@@ -11,8 +11,9 @@ import {
   buscarUltimoGiroRemoto, sortearGiroRemoto, gerarIdSeguro, girarRoleta,
   validarConfiguracao, adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela,
-  normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela
-} from "./core.js?v=20261022-tv4";
+  normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela,
+  calcularAtrasoSincronizado
+} from "./core.js?v=20261023-sync1";
 
 const parametros = new URLSearchParams(location.search);
 const FORCAR_MODO_LEGADO = parametros.get("legacy") === "1" || window.KORAX_MODO_LEGADO_ATIVO === true;
@@ -28,6 +29,16 @@ const CHAVE_EVENTO_TELA = "korax_rewards_evento_tela_v1";
 let trocandoPerfil = false;
 let timerSincronizacao = 0;
 let ultimoEventoId = "";
+
+function identificadorEvento(evento) {
+  return String(evento?.idEvento || evento?.idGiro || "");
+}
+
+async function aguardarInicioSincronizado(evento) {
+  const atraso = calcularAtrasoSincronizado(evento);
+  if (atraso <= 0) return;
+  await new Promise((resolver) => setTimeout(resolver, atraso));
+}
 
 function chaveEventoVisto(nomePerfil) {
   return `${CHAVE_EVENTO_TELA}:${normalizarChavePerfil(nomePerfil)}`;
@@ -229,6 +240,8 @@ async function iniciarFluxoDeGiro(nomeParticipante) {
       registro = await sortearGiroRemoto(nomeParticipante, idGiro, Estado.nomePerfilAtivo);
     }
     prepararRoletaParaResultado(registro);
+    mostrarToast("Giro confirmado • sincronizando com as TVs…");
+    await aguardarInicioSincronizado(registro);
     tocarSom("audioGiro");
     const duracaoMs = Estado.config.roleta?.duracaoGiroMs || 4800;
     girarRoleta(registro.premio, duracaoMs, () => finalizarGiroLocal(registro));
@@ -279,6 +292,9 @@ async function executarGiroNaTela(evento) {
   }
   Estado.girando = true;
   prepararRoletaParaResultado({ premio: evento.premio, premios: evento.premios, perfil: evento.perfil });
+  const atraso = calcularAtrasoSincronizado(evento);
+  if (atraso > 0) atualizarStatusTela(`Giro sincronizado • ${Estado.nomePerfilAtivo}`, true);
+  await aguardarInicioSincronizado(evento);
   tocarSom("audioGiro");
   const duracaoMs = Estado.config.roleta?.duracaoGiroMs || 4800;
   girarRoleta(evento.premio, duracaoMs, () => {
@@ -304,11 +320,12 @@ function iniciarSincronizacaoTela() {
     try {
       const evento = await buscarUltimoGiroRemoto(perfilFixo ? Estado.nomePerfilAtivo : "");
       atualizarStatusTela(`Tela conectada • ${Estado.nomePerfilAtivo}`, true);
-      if (evento?.idGiro && evento.idGiro !== ultimoEventoId) {
+      const idEvento = identificadorEvento(evento);
+      if (idEvento && idEvento !== ultimoEventoId) {
         const criadoEm = Date.parse(evento.criadoEm || "");
         const idade = Date.now() - criadoEm;
         const eventoRecente = Number.isFinite(criadoEm) && idade >= -30000 && idade <= JANELA_EVENTO_TELA_MS;
-        marcarEventoVisto(canal, evento.idGiro);
+        marcarEventoVisto(canal, idEvento);
         if (eventoRecente) await executarGiroNaTela(evento);
       }
     } catch (erro) {

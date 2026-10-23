@@ -174,8 +174,17 @@ export async function buscarPerfilPublicoRemoto(nome) {
 
 /** Último evento público do perfil, usado apenas pelo modo tela. */
 export async function buscarUltimoGiroRemoto(nome) {
+  const clienteEnviadoEm = Date.now();
   const dados = await chamarBackendGet("ultimoGiro", { perfil: String(nome || "") });
-  return dados.dados || null;
+  const clienteRecebidoEm = Date.now();
+  if (!dados.dados) return null;
+  return {
+    ...dados.dados,
+    servidorRecebeuEm: Number(dados.servidorRecebeuEm) || 0,
+    servidorAgora: Number(dados.servidorAgora) || 0,
+    clienteEnviadoEm,
+    clienteRecebidoEm
+  };
 }
 
 /** Lista todos os perfis salvos na "biblioteca" central. */
@@ -203,6 +212,7 @@ export async function excluirPerfilRemoto(nome) {
 
 /** O backend sorteia e registra atomicamente; o cliente apenas anima o resultado. */
 export async function sortearGiroRemoto(nome, idGiro = gerarIdSeguro(), perfil = Estado.nomePerfilAtivo) {
+  const clienteEnviadoEm = Date.now();
   const dados = await chamarBackendPost({
     acao: "sortearGiro",
     idGiro,
@@ -210,7 +220,36 @@ export async function sortearGiroRemoto(nome, idGiro = gerarIdSeguro(), perfil =
     nome: String(nome || "").trim(),
     perfil: String(perfil || "").trim()
   });
-  return dados.dados;
+  const clienteRecebidoEm = Date.now();
+  return {
+    ...dados.dados,
+    servidorRecebeuEm: Number(dados.servidorRecebeuEm) || 0,
+    servidorAgora: Number(dados.servidorAgora) || 0,
+    clienteEnviadoEm,
+    clienteRecebidoEm
+  };
+}
+
+/**
+ * Converte o instante comum do servidor para o relógio deste dispositivo.
+ * O ponto médio da requisição compensa diferenças de relógio e boa parte da
+ * latência, mantendo notebook e TVs alinhados sem exigir WebSocket.
+ */
+export function calcularAtrasoSincronizado(evento, agora = Date.now()) {
+  const iniciarEm = Number(evento && evento.iniciarEm);
+  if (!Number.isFinite(iniciarEm) || iniciarEm <= 0) return 0;
+  const servidorRecebeuEm = Number(evento.servidorRecebeuEm);
+  const servidorAgora = Number(evento.servidorAgora);
+  const enviadoEm = Number(evento.clienteEnviadoEm);
+  const recebidoEm = Number(evento.clienteRecebidoEm);
+  let diferencaRelogio = 0;
+  if (Number.isFinite(servidorRecebeuEm) && servidorRecebeuEm > 0 && Number.isFinite(servidorAgora) && servidorAgora >= servidorRecebeuEm && Number.isFinite(enviadoEm) && Number.isFinite(recebidoEm) && recebidoEm >= enviadoEm) {
+    diferencaRelogio = ((servidorRecebeuEm - enviadoEm) + (servidorAgora - recebidoEm)) / 2;
+  } else if (Number.isFinite(servidorAgora) && servidorAgora > 0 && Number.isFinite(enviadoEm) && Number.isFinite(recebidoEm) && recebidoEm >= enviadoEm) {
+    diferencaRelogio = servidorAgora - ((enviadoEm + recebidoEm) / 2);
+  }
+  const atraso = iniciarEm - diferencaRelogio - Number(agora);
+  return Math.max(0, Math.min(10000, Math.round(atraso)));
 }
 
 export function gerarIdSeguro() {

@@ -56,4 +56,8 @@ test("o receptor legado usa SVG e audios absolutos para o proxy da TV", () => {
   assert.match(legacy, /root\.requestFullscreen \|\| root\.webkitRequestFullscreen/);
   assert.match(legacy, /window\.setTimeout\(enterFullscreen, 350\)/);
   assert.match(legacy, /button\.innerHTML = "&#x26F6; TELA CHEIA"/);
+  assert.match(legacy, /function synchronizedDelay\(event\)/);
+  assert.match(legacy, /event\.idEvento \|\| event\.idGiro/);
+  assert.match(legacy, /event\.servidorAgora = Number\(payload\.servidorAgora\)/);
+  assert.match(legacy, /serverReceivedAt - sentAt/);
 });
