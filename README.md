@@ -112,6 +112,8 @@ Quando a Corporate Screen incorpora esse link na playlist, a página reconhece a
 
 O mesmo endereço também reconhece automaticamente navegadores antigos de TVs Samsung/LG e carrega um receptor ES5 leve. Não é necessário cadastrar um link diferente nem acrescentar parâmetros na playlist.
 
+Os arquivos essenciais da tela usam URLs absolutas. Isso permite que a roleta continue carregando quando a Corporate Screen apresenta a página por meio do próprio domínio em vez de navegar diretamente no GitHub Pages.
+
 A tela da playlist deve permanecer carregada antes do giro. O player guarda localmente o último evento exibido e aceita eventos recentes depois de um recarregamento, evitando perder o giro durante a atualização de conteúdo da TV. As URLs antigas com `?modo=tela` continuam compatíveis.
 
 ## Planilhas e idempotência

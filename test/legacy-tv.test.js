@@ -25,9 +25,10 @@ function executarDeteccao({ userAgent = "Mozilla/5.0 Chrome/120", incorporado = 
 }
 
 test("o receptor legado reconhece automaticamente a TV usando o mesmo link", () => {
-  assert.match(index, /legacy-tv\.js[^\"]*" defer/);
+  assert.match(index, /https:\/\/victoralvees44\.github\.io\/korax-rewards\/legacy-tv\.js[^\"]*" defer/);
   assert.match(legacy, /POLL_INTERVAL_MS = 900/);
   assert.match(legacy, /request\("ultimoGiro"/);
+  assert.match(legacy, /BACKEND_PUBLICO = "https:\/\/script\.google\.com\/macros\/s\//);
   assert.equal(executarDeteccao().ativo, false);
   assert.equal(executarDeteccao({ incorporado: true }).ativo, true);
   assert.equal(executarDeteccao({ referenciador: "https://telas.telacorporativa.com.br/player/123" }).ativo, true);

@@ -47,6 +47,12 @@ if (!paginaPublica.includes('id="listaPerfisPublicos"') || !paginaPublica.includ
 if (!paginaPublica.includes('id="modalPerfil"') || !paginaPublica.includes('id="listaPerfisEntrada"')) {
   throw new Error("A página pública deve pedir a escolha do perfil na entrada.");
 }
+for (const recurso of ["style.css", "legacy-tv.css", "config.js", "legacy-tv.js", "roleta-app.js"]) {
+  const padraoAbsoluto = new RegExp(`(?:href|src)="https://victoralvees44\\.github\\.io/korax-rewards/${recurso.replace(".", "\\.")}`);
+  if (!padraoAbsoluto.test(paginaPublica)) {
+    throw new Error(`O recurso público ${recurso} deve usar URL absoluta para funcionar no proxy da TV.`);
+  }
+}
 if (!/acao === "perfisPublicos"/.test(gas) || !/acao === "perfilPublico"/.test(gas) || !/acao === "ultimoGiro"/.test(gas)) {
   throw new Error("O backend deve expor os perfis usados pelo menu público.");
 }

@@ -1,6 +1,7 @@
 (function () {
   "use strict";
 
+  var BACKEND_PUBLICO = "https://script.google.com/macros/s/AKfycbztoFQ0_IT3JV5HJC8ixhmGbEyNi8Kt5oRZoNdkpuPkwOxTxvfytoW1wFkkQFDvVzWZ/exec";
   var query = parseQuery(window.location.search || "");
   var userAgent = String((window.navigator && window.navigator.userAgent) || "");
   var incorporado = false;
@@ -54,7 +55,7 @@
 
   function backendUrl() {
     var config = window.CONFIG_PADRAO || {};
-    return config.webhook && config.webhook.url ? String(config.webhook.url) : "";
+    return config.webhook && config.webhook.url ? String(config.webhook.url) : BACKEND_PUBLICO;
   }
 
   function request(action, params, callback) {
