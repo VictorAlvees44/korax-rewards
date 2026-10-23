@@ -15,7 +15,7 @@ import {
 } from "./core.js?v=20261022-tv4";
 
 const parametros = new URLSearchParams(location.search);
-const FORCAR_MODO_LEGADO = parametros.get("legacy") === "1";
+const FORCAR_MODO_LEGADO = parametros.get("legacy") === "1" || window.KORAX_MODO_LEGADO_ATIVO === true;
 const MODO_TELA = deveUsarModoTela({
   modo: parametros.get("modo") || "",
   incorporado: window.self !== window.top,

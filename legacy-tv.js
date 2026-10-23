@@ -2,7 +2,19 @@
   "use strict";
 
   var query = parseQuery(window.location.search || "");
-  if (query.legacy !== "1") return;
+  var userAgent = String((window.navigator && window.navigator.userAgent) || "");
+  var incorporado = false;
+  try { incorporado = window.self !== window.top; } catch (error) { incorporado = true; }
+  var referenciadorCorporativo = /(^|\/\/)([^/]*\.)?telacorporativa\.com\.br(?=[:/]|$)/i.test(String(document.referrer || ""));
+  var navegadorDeTv = /(smart[ -]?tv|tizen|web0s|webos|netcast|hbbtv|viera|inettvbrowser|maple|smart-hub|bravia|aft[a-z0-9]*|crkey|roku|hisense|vewd|opera tv|nettv|dtv|ce-html|android[^)]*\btv\b|; wv\))/i.test(userAgent);
+  var scriptDeTeste = document.createElement("script");
+  var semSuporteAModulos = !("noModule" in scriptDeTeste);
+  var modoLegadoAutomatico = incorporado || referenciadorCorporativo || navegadorDeTv || semSuporteAModulos;
+  if (query.legacy !== "1" && !modoLegadoAutomatico) return;
+
+  // Impede o módulo moderno de disputar o mesmo DOM quando o receptor leve
+  // foi escolhido automaticamente pelo dispositivo ou pela Corporate Screen.
+  window.KORAX_MODO_LEGADO_ATIVO = true;
 
   var EVENT_WINDOW_MS = 2 * 60 * 1000;
   var POLL_INTERVAL_MS = 900;

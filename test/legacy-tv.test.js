@@ -1,15 +1,38 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import vm from "node:vm";
 
 const index = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const legacy = readFileSync(new URL("../legacy-tv.js", import.meta.url), "utf8");
 
-test("o receptor legado so e ativado explicitamente pela playlist das TVs", () => {
+function executarDeteccao({ userAgent = "Mozilla/5.0 Chrome/120", incorporado = false, referenciador = "", suportaModulos = true } = {}) {
+  const listeners = [];
+  const janela = {
+    location: { search: "" },
+    navigator: { userAgent }
+  };
+  janela.self = janela;
+  janela.top = incorporado ? {} : janela;
+  const documento = {
+    referrer: referenciador,
+    readyState: "loading",
+    createElement: () => suportaModulos ? { noModule: true } : {},
+    addEventListener: (nome) => listeners.push(nome)
+  };
+  vm.runInNewContext(legacy, { window: janela, document: documento });
+  return { ativo: janela.KORAX_MODO_LEGADO_ATIVO === true, listeners };
+}
+
+test("o receptor legado reconhece automaticamente a TV usando o mesmo link", () => {
   assert.match(index, /legacy-tv\.js[^\"]*" defer/);
-  assert.match(legacy, /query\.legacy !== "1"/);
   assert.match(legacy, /POLL_INTERVAL_MS = 900/);
   assert.match(legacy, /request\("ultimoGiro"/);
+  assert.equal(executarDeteccao().ativo, false);
+  assert.equal(executarDeteccao({ incorporado: true }).ativo, true);
+  assert.equal(executarDeteccao({ referenciador: "https://telas.telacorporativa.com.br/player/123" }).ativo, true);
+  assert.equal(executarDeteccao({ userAgent: "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.5)" }).ativo, true);
+  assert.equal(executarDeteccao({ suportaModulos: false }).ativo, true);
 });
 
 test("o receptor legado evita sintaxe JavaScript moderna incompativel com as TVs", () => {
