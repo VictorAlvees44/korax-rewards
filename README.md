@@ -116,6 +116,8 @@ Os arquivos essenciais da tela usam URLs absolutas. Isso permite que a roleta co
 
 O receptor compatível desenha a roleta em SVG para evitar falhas de Canvas em navegadores antigos de Smart TVs. Ele também tenta reproduzir o som do giro e, ao final, palmas ou o áudio negativo. A TV só emitirá áudio se o player da Corporate Screen e a política de reprodução automática do navegador permitirem som em páginas web.
 
+O modo TV solicita tela cheia automaticamente e também mostra o botão `TELA CHEIA`, compatível com clique, toque ou a tecla Enter do controle. Por segurança, navegadores podem exigir essa primeira interação e a Corporate Screen precisa permitir tela cheia no conteúdo incorporado. Barras e rodapés criados pelo próprio player não podem ser removidos pela página da roleta.
+
 A tela da playlist deve permanecer carregada antes do giro. O player guarda localmente o último evento exibido e aceita eventos recentes depois de um recarregamento, evitando perder o giro durante a atualização de conteúdo da TV. As URLs antigas com `?modo=tela` continuam compatíveis.
 
 ## Planilhas e idempotência

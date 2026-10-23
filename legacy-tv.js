@@ -142,6 +142,57 @@
     } catch (error) {}
   }
 
+  function fullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;
+  }
+
+  function enterFullscreen() {
+    if (fullscreenElement()) return;
+    var root = document.documentElement;
+    if (!root) return;
+    var request = root.requestFullscreen || root.webkitRequestFullscreen || root.mozRequestFullScreen || root.msRequestFullscreen;
+    if (!request) return;
+    try {
+      var result = request.call(root);
+      if (result && result["catch"]) result["catch"](function () {});
+    } catch (error) {}
+  }
+
+  function updateFullscreenButton() {
+    var button = byId("btnTelaCheia");
+    if (!button) return;
+    button.style.display = fullscreenElement() ? "none" : "block";
+  }
+
+  function prepareFullscreen() {
+    var button = byId("btnTelaCheia");
+    var root = document.documentElement;
+    var supported = root && (root.requestFullscreen || root.webkitRequestFullscreen || root.mozRequestFullScreen || root.msRequestFullscreen);
+    if (!button || !supported) return;
+    button.disabled = false;
+    button.innerHTML = "&#x26F6; TELA CHEIA";
+    button.title = "Ativar tela cheia";
+    button.setAttribute("aria-label", "Ativar tela cheia");
+    button.onclick = function (event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      enterFullscreen();
+    };
+    var interaction = function () { enterFullscreen(); };
+    if (document.addEventListener) {
+      document.addEventListener("click", interaction, false);
+      document.addEventListener("touchend", interaction, false);
+      document.addEventListener("keydown", function (event) {
+        if (!event || event.keyCode === 13) enterFullscreen();
+      }, false);
+      document.addEventListener("fullscreenchange", updateFullscreenButton, false);
+      document.addEventListener("webkitfullscreenchange", updateFullscreenButton, false);
+    }
+    updateFullscreenButton();
+    // Alguns players em modo kiosk permitem a solicitação sem interação.
+    // Onde o navegador bloquear, o botão ou a tecla Enter concluem a ação.
+    window.setTimeout(enterFullscreen, 350);
+  }
+
   function prepareLayout() {
     addClass(document.body, "modo-tela");
     addClass(document.body, "modo-tela-legado");
@@ -507,6 +558,7 @@
 
   function start() {
     prepareLayout();
+    prepareFullscreen();
     prepareAudio();
     loadInitialConfig();
   }

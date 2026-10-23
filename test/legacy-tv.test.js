@@ -53,4 +53,7 @@ test("o receptor legado usa SVG e audios absolutos para o proxy da TV", () => {
   assert.match(legacy, /playAudio\(selected\.positivo === false \? "audioDerrota" : "audioVitoria"\)/);
   assert.match(legacy, /viewportHeight - 112/);
   assert.match(legacy, /viewportWidth \* 0\.94/);
+  assert.match(legacy, /root\.requestFullscreen \|\| root\.webkitRequestFullscreen/);
+  assert.match(legacy, /window\.setTimeout\(enterFullscreen, 350\)/);
+  assert.match(legacy, /button\.innerHTML = "&#x26F6; TELA CHEIA"/);
 });
