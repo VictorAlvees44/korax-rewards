@@ -1,6 +1,6 @@
 # Korax Rewards — Roleta da Sorte
 
-Roleta corporativa para campanhas e eventos, publicada no GitHub Pages e integrada a um backend Google Apps Script. O servidor escolhe cada resultado de forma autoritativa. O registro operacional no Google Sheets e a notificação por e-mail contêm somente nome da pessoa e data do giro.
+Roleta corporativa para campanhas e eventos, publicada no GitHub Pages e integrada a um backend Google Apps Script. O servidor escolhe cada resultado de forma autoritativa. O registro operacional no Google Sheets e a notificação por e-mail contêm nome da pessoa, data do giro e prêmio sorteado.
 
 Produção: <https://victoralvees44.github.io/korax-rewards/>
 
@@ -92,7 +92,7 @@ Os sons são definitivos e não aparecem no painel: `roleta-girando.mp3` durante
 3. Para trocar uma cor, clique em **↻**. A nova cor também exclui todas as cores atuais, inclusive a que está sendo substituída. Não há seletor manual de cores dos prêmios.
 4. Clique em **Salvar alterações deste perfil**. Para criar outro conjunto de prêmios, abra **Perfis**, informe o novo nome e use **Criar novo perfil com estes prêmios**.
 
-Ao entrar na página pública, o usuário escolhe o perfil antes de ver a roleta. Os perfis continuam disponíveis no menu lateral para troca; o prêmio é exibido na tela, mas o registro operacional guarda somente nome e data.
+Ao entrar na página pública, o usuário escolhe o perfil antes de ver a roleta. Os perfis continuam disponíveis no menu lateral para troca; o prêmio é exibido na tela e também fica registrado junto ao nome e à data.
 
 Durante o salvamento, o painel bloqueia novas edições até a resposta do servidor, mantendo a biblioteca e a roleta na mesma versão dos prêmios.
 
@@ -116,7 +116,7 @@ A tela da playlist deve permanecer carregada antes do giro. O player guarda loca
 
 ## Planilhas e idempotência
 
-Os novos giros são gravados em abas no formato `Registros - MM-AAAA`, com exatamente duas colunas: `Nome` e `Data`. A aba técnica oculta `_Controle_Giros_v2` guarda ID aleatório, prêmio, perfil e instante do giro, mas **não guarda o nome**. Ela permite devolver o mesmo resultado se uma solicitação for repetida, sem criar outra linha ou enviar outro e-mail.
+Os novos giros são gravados em abas no formato `Registros - MM-AAAA`, com três colunas: `Nome`, `Data` e `Prêmio`. As abas existentes recebem automaticamente a coluna `Prêmio`; os registros antigos permanecem intactos e podem ficar com essa coluna vazia. A aba técnica oculta `_Controle_Giros_v2` guarda ID aleatório, prêmio, perfil e instante do giro, mas **não guarda o nome**. Ela permite devolver o mesmo resultado se uma solicitação for repetida, sem criar outra linha ou enviar outro e-mail.
 
 As abas antigas não são apagadas nem modificadas automaticamente. Elas podem conter as colunas anteriores; revise sua retenção e arquivamento separadamente.
 

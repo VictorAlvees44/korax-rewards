@@ -7,8 +7,8 @@
  *   EMAIL_DESTINATARIO  um ou mais e-mails separados por virgula
  */
 
-// A planilha operacional registra somente os dois dados solicitados.
-var CABECALHO = ["Nome", "Data"];
+// A planilha operacional registra os dados necessários para entregar o prêmio.
+var CABECALHO = ["Nome", "Data", "Prêmio"];
 // Controle técnico separado: não contém o nome do participante e fica oculto.
 var CABECALHO_CONTROLE = ["ID do Giro", "Prêmio (JSON)", "Perfil", "Registrado em"];
 var PASTA_PERFIS_NOME = "RoletaCorp_Perfis";
@@ -340,7 +340,7 @@ function sortearERegistrarGiro(corpo) {
     var data = Utilities.formatDate(agora, fuso, "dd/MM/yyyy");
     var aba = obterAbaRegistrosDoMes(agora);
     garantirCabecalhoAtual(aba);
-    aba.appendRow([textoSeguroPlanilha(nome), data]);
+    aba.appendRow([textoSeguroPlanilha(nome), data, textoSeguroPlanilha(premio.nome)]);
     var controle = obterAbaControle();
     controle.appendRow([idGiro, JSON.stringify(premio), textoSeguroPlanilha(ativo.nome), agora]);
     resultado = { idGiro: idGiro, nome: nome, premio: premio, premios: premios, perfil: ativo.nome, data: data };
@@ -507,6 +507,11 @@ function garantirCabecalhoAtual(aba) {
     if (atual[0] !== CABECALHO[0] || atual[1] !== CABECALHO[1]) {
       throw new Error("A aba de registros possui um cabeçalho incompatível.");
     }
+    if (!atual[2]) {
+      aba.getRange(1, 3).setValue(CABECALHO[2]).setFontWeight("bold");
+    } else if (atual[2] !== CABECALHO[2]) {
+      throw new Error("A coluna de prêmio da aba de registros possui um cabeçalho incompatível.");
+    }
   }
 }
 
@@ -516,7 +521,9 @@ function enviarEmailNotificacao(dados) {
   var assunto = "Novo registro da Roleta Korax";
   var corpo =
     "Um novo giro foi registrado:\n\n" +
-    "Nome: " + dados.nome + "\nData: " + dados.data + "\n";
+    "Nome: " + dados.nome + "\n" +
+    "Data: " + dados.data + "\n" +
+    "Prêmio: " + dados.premio.nome + "\n";
   MailApp.sendEmail(destinatario, assunto, corpo);
 }
 

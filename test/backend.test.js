@@ -161,7 +161,7 @@ test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {
   assert.equal(resultado.dados.premio.id, config.premios[2].id);
   assert.equal(resultado.dados.perfil, "Comercial");
   assert.equal(linhas.length, 1);
-  assert.deepEqual(Array.from(linhas[0]), ["Teste local", "03/09/2026"]);
+  assert.deepEqual(Array.from(linhas[0]), ["Teste local", "03/09/2026", config.premios[2].nome]);
   assert.equal(controle.length, 1);
   assert.equal(controle[0].length, 4);
   assert.ok(!controle[0].includes("Teste local"));
@@ -202,7 +202,7 @@ test("o servidor sorteia somente dentro do perfil salvo que foi selecionado", ()
   assert.equal(resultado.dados.premio.nome, "Item exclusivo da feira");
 });
 
-test("notificação administrativa contém somente nome e data", () => {
+test("notificação administrativa contém nome, data e prêmio", () => {
   const ctx = backend();
   let enviado;
   ctx.PropertiesService = { getScriptProperties: () => ({ getProperty: () => "equipe@example.com" }) };
@@ -212,8 +212,27 @@ test("notificação administrativa contém somente nome e data", () => {
     premio: { nome: "Chocolate", positivo: true }, perfil: "Comercial"
   });
   assert.equal(enviado[0], "equipe@example.com");
-  assert.match(enviado[2], /Nome: Maria\nData: 16\/09\/2026/);
-  assert.doesNotMatch(enviado[2], /Chocolate|Comercial|1234567890abcdef|Tipo:|Hora:/);
+  assert.match(enviado[2], /Nome: Maria\nData: 16\/09\/2026\nPrêmio: Chocolate/);
+  assert.doesNotMatch(enviado[2], /Comercial|1234567890abcdef|Tipo:|Hora:/);
+});
+
+test("a planilha existente recebe a coluna Prêmio sem perder o cabeçalho atual", () => {
+  const ctx = backend();
+  const valores = [["Nome", "Data", ""]];
+  let peso = "";
+  const intervaloCabecalho = {
+    getValues: () => valores,
+    setValue: (valor) => { valores[0][2] = valor; return intervaloCabecalho; },
+    setFontWeight: (valor) => { peso = valor; return intervaloCabecalho; }
+  };
+  const aba = {
+    getLastRow: () => 3,
+    getRange: (...args) => args.length === 2 ? intervaloCabecalho : intervaloCabecalho
+  };
+
+  ctx.garantirCabecalhoAtual(aba);
+  assert.equal(valores[0][2], "Prêmio");
+  assert.equal(peso, "bold");
 });
 
 test("requisição repetida preserva resultado sem criar novo registro", () => {
