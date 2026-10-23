@@ -51,4 +51,6 @@ test("o receptor legado usa SVG e audios absolutos para o proxy da TV", () => {
   assert.match(legacy, /assets\/audio\/palmas\.mp3/);
   assert.match(legacy, /assets\/audio\/naruto-sad\.mp3/);
   assert.match(legacy, /playAudio\(selected\.positivo === false \? "audioDerrota" : "audioVitoria"\)/);
+  assert.match(legacy, /viewportHeight - 112/);
+  assert.match(legacy, /viewportWidth \* 0\.94/);
 });

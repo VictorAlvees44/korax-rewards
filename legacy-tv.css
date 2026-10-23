@@ -2,13 +2,13 @@
 html, body.modo-tela-legado { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #070b14; color: #fff; }
 .modo-tela-legado .palco { position: relative; display: block; width: 100%; height: 100%; min-height: 0; overflow: hidden; background: #070b14; }
 .modo-tela-legado .palco__fundo { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-position: center; background-size: cover; opacity: .25; }
-.modo-tela-legado .topo { position: absolute; z-index: 2; top: 0; left: 0; width: 100%; height: 72px; min-height: 0; padding: 10px 24px; }
-.modo-tela-legado .topo__logo { width: 210px; max-height: 58px; }
+.modo-tela-legado .topo { position: absolute; z-index: 2; top: 0; left: 0; width: 100%; height: 56px; min-height: 0; padding: 8px 20px; }
+.modo-tela-legado .topo__logo { width: 190px; max-height: 48px; }
 .modo-tela-legado .topo__nome-empresa { color: #fff; font: bold 21px Arial, sans-serif; }
-.modo-tela-legado .experiencia-roleta { position: absolute; z-index: 2; display: block; top: 72px; right: 0; bottom: 0; left: 0; width: auto; padding: 0; }
+.modo-tela-legado .experiencia-roleta { position: absolute; z-index: 2; display: block; top: 56px; right: 0; bottom: 0; left: 0; width: auto; padding: 0; }
 .modo-tela-legado .centro-roleta { position: absolute; display: block; top: 0; right: 0; bottom: 0; left: 0; text-align: center; }
-.modo-tela-legado .topo__titulo { display: block; margin: 0 auto 4px; color: #e8c766; font: bold 24px Arial, sans-serif; text-align: center; }
-.modo-tela-legado .status-tela { display: block; height: 20px; margin: 0 auto 4px; color: #ffcf9f; font: bold 13px Arial, sans-serif; text-align: center; }
+.modo-tela-legado .topo__titulo { display: block; margin: 0 auto 2px; color: #e8c766; font: bold 24px Arial, sans-serif; text-align: center; }
+.modo-tela-legado .status-tela { display: block; height: 18px; margin: 0 auto 2px; color: #ffcf9f; font: bold 13px Arial, sans-serif; text-align: center; }
 .modo-tela-legado .status-tela--conectado { color: #79d7ad; }
 .modo-tela-legado .arena { position: relative; display: block; width: 100%; padding: 0; text-align: center; }
 .modo-tela-legado .arena__roleta-wrap { position: relative; display: inline-block; margin: 0 auto; }

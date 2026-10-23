@@ -160,7 +160,11 @@
   function resizeWheel() {
     var wrap = document.querySelector ? document.querySelector(".arena__roleta-wrap") : null;
     if (!wrap) return;
-    var width = Math.min((window.innerHeight || 720) * 0.72, (window.innerWidth || 1280) * 0.72, 720);
+    var viewportHeight = window.innerHeight || 720;
+    var viewportWidth = window.innerWidth || 1280;
+    // Reserva somente o cabeçalho, o título e o status. O restante da área
+    // cedida pelo player fica para a roleta, sem cortar a borda inferior.
+    var width = Math.min(viewportHeight - 112, viewportWidth * 0.94, 900);
     width = Math.max(260, Math.floor(width));
     wrap.style.width = width + "px";
     wrap.style.height = width + "px";
