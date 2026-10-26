@@ -44,9 +44,10 @@ test("notebook e TVs convertem o horário do servidor para o mesmo instante loca
     clienteEnviadoEm: 102000,
     clienteRecebidoEm: 102300
   };
-  // Apesar dos relógios e latências diferentes, os dois aguardam 3,5 s.
-  assert.equal(calcularAtrasoSincronizado(notebook, 99000), 3500);
-  assert.equal(calcularAtrasoSincronizado(tv, 102500), 3500);
+  // Apesar dos relógios e latências diferentes, ambos aplicam a mesma margem
+  // de recepção e aguardam exatamente 6,5 s.
+  assert.equal(calcularAtrasoSincronizado(notebook, 99000), 6500);
+  assert.equal(calcularAtrasoSincronizado(tv, 102500), 6500);
   assert.equal(calcularAtrasoSincronizado({ iniciarEm: 90000 }, 100000), 0);
   assert.equal(calcularAtrasoSincronizado({}, 100000), 0);
 });

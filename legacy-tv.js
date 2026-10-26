@@ -25,6 +25,7 @@
 
   var EVENT_WINDOW_MS = 2 * 60 * 1000;
   var POLL_INTERVAL_MS = 900;
+  var SCREEN_RECEPTION_MARGIN_MS = 3000;
   var state = {
     config: null,
     profile: "",
@@ -500,7 +501,7 @@
     } else if (isFinite(serverNow) && serverNow > 0 && isFinite(sentAt) && isFinite(receivedAt) && receivedAt >= sentAt) {
       clockDifference = serverNow - ((sentAt + receivedAt) / 2);
     }
-    return Math.max(0, Math.min(10000, Math.round(startAt - clockDifference - new Date().getTime())));
+    return Math.max(0, Math.min(10000, Math.round(startAt + SCREEN_RECEPTION_MARGIN_MS - clockDifference - new Date().getTime())));
   }
 
   function runEvent(event) {

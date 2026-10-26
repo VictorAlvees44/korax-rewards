@@ -60,4 +60,5 @@ test("o receptor legado usa SVG e audios absolutos para o proxy da TV", () => {
   assert.match(legacy, /event\.idEvento \|\| event\.idGiro/);
   assert.match(legacy, /event\.servidorAgora = Number\(payload\.servidorAgora\)/);
   assert.match(legacy, /serverReceivedAt - sentAt/);
+  assert.match(legacy, /SCREEN_RECEPTION_MARGIN_MS = 3000/);
 });
