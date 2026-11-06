@@ -121,7 +121,7 @@ test("o evento da tela transmite o prêmio, mas nunca o nome da pessoa", () => {
   assert.equal(evento.idGiro, "1234567890abcdef");
   assert.equal(evento.premio.id, config.premios[0].id);
   assert.equal(evento.premios.length, config.premios.length);
-  assert.equal(evento.iniciarEm - Date.parse(evento.criadoEm), 4000);
+  assert.equal(evento.iniciarEm - Date.parse(evento.criadoEm), 2000);
   assert.equal(evento.idEvento, `${evento.idGiro}_${evento.iniciarEm}`);
   assert.equal("nome" in evento, false);
   assert.doesNotMatch(JSON.stringify(evento), /Nome que não pode vazar/);

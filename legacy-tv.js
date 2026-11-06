@@ -25,7 +25,6 @@
 
   var EVENT_WINDOW_MS = 2 * 60 * 1000;
   var POLL_INTERVAL_MS = 900;
-  var SCREEN_RECEPTION_MARGIN_MS = 3000;
   var state = {
     config: null,
     profile: "",
@@ -33,7 +32,8 @@
     spinning: false,
     lastEventId: "",
     pollTimer: 0,
-    resultTimer: 0
+    resultTimer: 0,
+    pollGeneration: 0
   };
 
   function parseQuery(value) {
@@ -501,7 +501,7 @@
     } else if (isFinite(serverNow) && serverNow > 0 && isFinite(sentAt) && isFinite(receivedAt) && receivedAt >= sentAt) {
       clockDifference = serverNow - ((sentAt + receivedAt) / 2);
     }
-    return Math.max(0, Math.min(10000, Math.round(startAt + SCREEN_RECEPTION_MARGIN_MS - clockDifference - new Date().getTime())));
+    return Math.max(0, Math.min(10000, Math.round(startAt - clockDifference - new Date().getTime())));
   }
 
   function runEvent(event) {
@@ -545,6 +545,7 @@
 
   function poll() {
     window.clearTimeout(state.pollTimer);
+    var generation = ++state.pollGeneration;
     var requestedAt = new Date().getTime();
     request("ultimoGiro", { perfil: query.perfil || "" }, function (error, payload) {
       if (error) {
@@ -564,8 +565,15 @@
           if (!isNaN(createdAt) && age >= -30000 && age <= EVENT_WINDOW_MS) runEvent(event);
         }
       }
-      state.pollTimer = window.setTimeout(poll, POLL_INTERVAL_MS);
+      if (generation === state.pollGeneration) state.pollTimer = window.setTimeout(poll, POLL_INTERVAL_MS);
     });
+  }
+
+  function receiveCorporateScreenWake(event) {
+    if (!event || event.origin !== "https://telas.telacorporativa.com.br" || event.source !== window.parent) return;
+    var data = event.data;
+    if (!data || data.type !== "CORPORATE_SCREEN_ROULETTE_WAKE" || !/^[A-Za-z0-9_-]{16,160}$/.test(String(data.eventId || ""))) return;
+    poll();
   }
 
   function loadInitialConfig() {
@@ -587,6 +595,8 @@
     prepareLayout();
     prepareFullscreen();
     prepareAudio();
+    if (window.addEventListener) window.addEventListener("message", receiveCorporateScreenWake, false);
+    else if (window.attachEvent) window.attachEvent("onmessage", receiveCorporateScreenWake);
     loadInitialConfig();
   }
 

@@ -26,7 +26,6 @@ export const SONS_FIXOS = Object.freeze({
 });
 
 let tokenAdmin = "";
-const MARGEM_RECEPCAO_TELAS_MS = 3000;
 
 export const Estado = {
   config: null,
@@ -249,9 +248,10 @@ export function calcularAtrasoSincronizado(evento, agora = Date.now()) {
   } else if (Number.isFinite(servidorAgora) && servidorAgora > 0 && Number.isFinite(enviadoEm) && Number.isFinite(recebidoEm) && recebidoEm >= enviadoEm) {
     diferencaRelogio = servidorAgora - ((enviadoEm + recebidoEm) / 2);
   }
-  // Soma uma margem comum para absorver um ciclo lento de consulta do Apps
-  // Script sem alterar o alinhamento: todas as telas acrescentam o mesmo valor.
-  const atraso = iniciarEm + MARGEM_RECEPCAO_TELAS_MS - diferencaRelogio - Number(agora);
+  // O backend já publica um instante futuro comum. O aviso em tempo real do
+  // Corporate Screen antecipa a consulta das TVs; somar outra margem aqui
+  // apenas atrasaria notebook e telas depois de todos já terem o evento.
+  const atraso = iniciarEm - diferencaRelogio - Number(agora);
   return Math.max(0, Math.min(10000, Math.round(atraso)));
 }
 

@@ -18,7 +18,9 @@ var TAMANHO_MAX_REQUISICAO = 8 * 1024 * 1024;
 var LIMITE_GIROS_JANELA = 20;
 var SEGUNDOS_JANELA_GIROS = 300;
 var SEGUNDOS_EVENTO_TELA = 600;
-var ATRASO_INICIO_GIRO_MS = 4000;
+// Janela curta para o aviso em tempo real chegar às TVs e cada uma confirmar
+// o evento oficial neste backend. O polling de contingência continua ativo.
+var ATRASO_INICIO_GIRO_MS = 2000;
 var CHAVE_EVENTO_TELA_GLOBAL = "tela_global_v1";
 var CHAVE_EVENTO_PERSISTENTE_GLOBAL = "evento_tela_global_v1";
 var SEGUNDOS_SESSAO_ADMIN = 8 * 60 * 60;

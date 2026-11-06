@@ -5,6 +5,7 @@ import vm from "node:vm";
 
 const index = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const legacy = readFileSync(new URL("../legacy-tv.js", import.meta.url), "utf8");
+const moderno = readFileSync(new URL("../roleta-app.js", import.meta.url), "utf8");
 
 function executarDeteccao({ userAgent = "Mozilla/5.0 Chrome/120", incorporado = false, referenciador = "", suportaModulos = true } = {}) {
   const listeners = [];
@@ -60,5 +61,15 @@ test("o receptor legado usa SVG e audios absolutos para o proxy da TV", () => {
   assert.match(legacy, /event\.idEvento \|\| event\.idGiro/);
   assert.match(legacy, /event\.servidorAgora = Number\(payload\.servidorAgora\)/);
   assert.match(legacy, /serverReceivedAt - sentAt/);
-  assert.match(legacy, /SCREEN_RECEPTION_MARGIN_MS = 3000/);
+  assert.doesNotMatch(legacy, /SCREEN_RECEPTION_MARGIN_MS/);
+  assert.match(legacy, /CORPORATE_SCREEN_ROULETTE_WAKE/);
+  assert.match(legacy, /window\.addEventListener\("message", receiveCorporateScreenWake/);
+});
+
+test("o giro avisa o Corporate Screen e mantém o polling como contingência", () => {
+  assert.match(index, /connect-src[^>]+https:\/\/telas\.telacorporativa\.com\.br/);
+  assert.match(moderno, /https:\/\/telas\.telacorporativa\.com\.br\/api\/roulette\/wake/);
+  assert.match(moderno, /avisarCorporateScreen\(registro\)/);
+  assert.match(moderno, /addEventListener\("message", receberAvisoCorporateScreen\)/);
+  assert.match(moderno, /setTimeout\(consultar, 900\)/);
 });

@@ -110,6 +110,8 @@ Na playlist da TV, cadastre uma página web com exatamente o mesmo link usado no
 
 Quando a Corporate Screen incorpora esse link na playlist, a página reconhece automaticamente o contexto de TV e aguarda os giros de qualquer perfil. No notebook, o mesmo endereço continua exibindo a escolha de perfil e o botão de giro. O perfil e o resultado sorteados no notebook são reproduzidos na TV sem registrar novamente o participante.
 
+Depois que o backend confirma o giro, o notebook envia apenas o ID aleatório do evento ao relay do Corporate Screen. As TVs conectadas por WebSocket recebem um aviso imediato e consultam o resultado oficial no Apps Script; prêmio e nome não são confiados ao relay. O polling de 900 ms continua ativo como contingência. Para manter o alinhamento mesmo com a latência do Apps Script, o backend publica um início comum 2 segundos à frente, sem a antiga margem adicional de 3 segundos no navegador.
+
 Cada giro recebe do servidor um horário único e os clientes acrescentam uma margem comum de recepção, totalizando aproximadamente sete segundos de preparação. Notebook e todas as TVs corrigem a diferença de relógio pela resposta do servidor e aguardam esse mesmo instante antes de animar. Assim, telas conectadas começam juntas mesmo que uma delas receba o evento antes da outra. Uma tela que estiver offline ou receber o evento somente depois do horário inicia assim que reconectar.
 
 O mesmo endereço também reconhece automaticamente navegadores antigos de TVs Samsung/LG e carrega um receptor ES5 leve. Não é necessário cadastrar um link diferente nem acrescentar parâmetros na playlist.

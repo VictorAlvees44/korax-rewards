@@ -13,7 +13,7 @@ import {
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela,
   normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela,
   calcularAtrasoSincronizado
-} from "./core.js?v=20261026-sync2";
+} from "./core.js?v=20261106-fast1";
 
 const parametros = new URLSearchParams(location.search);
 const FORCAR_MODO_LEGADO = parametros.get("legacy") === "1" || window.KORAX_MODO_LEGADO_ATIVO === true;
@@ -25,14 +25,41 @@ const MODO_TELA = deveUsarModoTela({
 const PERFIL_DA_URL = String(parametros.get("perfil") || "").trim();
 const JANELA_EVENTO_TELA_MS = 2 * 60 * 1000;
 const CHAVE_EVENTO_TELA = "korax_rewards_evento_tela_v1";
+const URL_AVISO_CORPORATE_SCREEN = "https://telas.telacorporativa.com.br/api/roulette/wake";
+const ORIGEM_CORPORATE_SCREEN = "https://telas.telacorporativa.com.br";
+const TIPO_AVISO_CORPORATE_SCREEN = "CORPORATE_SCREEN_ROULETTE_WAKE";
 
 let trocandoPerfil = false;
 let timerSincronizacao = 0;
 let ultimoEventoId = "";
+let consultarSincronizacaoTelaAgora = null;
 
 function identificadorEvento(evento) {
   return String(evento?.idEvento || evento?.idGiro || "");
 }
+
+function avisarCorporateScreen(evento) {
+  const idEvento = identificadorEvento(evento);
+  if (!/^[A-Za-z0-9_-]{16,160}$/.test(idEvento) || typeof fetch !== "function") return;
+  try {
+    void fetch(URL_AVISO_CORPORATE_SCREEN, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+      body: idEvento,
+      mode: "cors",
+      keepalive: true
+    }).catch(() => {});
+  } catch (ignorado) {}
+}
+
+function receberAvisoCorporateScreen(evento) {
+  if (!MODO_TELA || evento.origin !== ORIGEM_CORPORATE_SCREEN || evento.source !== window.parent) return;
+  const dados = evento.data;
+  if (!dados || dados.type !== TIPO_AVISO_CORPORATE_SCREEN || !/^[A-Za-z0-9_-]{16,160}$/.test(String(dados.eventId || ""))) return;
+  if (typeof consultarSincronizacaoTelaAgora === "function") consultarSincronizacaoTelaAgora();
+}
+
+window.addEventListener("message", receberAvisoCorporateScreen);
 
 async function aguardarInicioSincronizado(evento) {
   const atraso = calcularAtrasoSincronizado(evento);
@@ -240,6 +267,7 @@ async function iniciarFluxoDeGiro(nomeParticipante) {
       registro = await sortearGiroRemoto(nomeParticipante, idGiro, Estado.nomePerfilAtivo);
     }
     prepararRoletaParaResultado(registro);
+    avisarCorporateScreen(registro);
     mostrarToast("Giro confirmado • sincronizando com as TVs…");
     await aguardarInicioSincronizado(registro);
     tocarSom("audioGiro");
@@ -316,7 +344,10 @@ function iniciarSincronizacaoTela() {
   const perfilFixo = Boolean(PERFIL_DA_URL);
   const canal = perfilFixo ? Estado.nomePerfilAtivo : "todos-os-perfis";
   ultimoEventoId = obterEventoVisto(canal);
+  let geracaoConsulta = 0;
   const consultar = async () => {
+    const geracaoAtual = ++geracaoConsulta;
+    clearTimeout(timerSincronizacao);
     try {
       const evento = await buscarUltimoGiroRemoto(perfilFixo ? Estado.nomePerfilAtivo : "");
       atualizarStatusTela(`Tela conectada • ${Estado.nomePerfilAtivo}`, true);
@@ -331,9 +362,10 @@ function iniciarSincronizacaoTela() {
     } catch (erro) {
       atualizarStatusTela("Reconectando à roleta…", false);
     } finally {
-      timerSincronizacao = setTimeout(consultar, 900);
+      if (geracaoAtual === geracaoConsulta) timerSincronizacao = setTimeout(consultar, 900);
     }
   };
+  consultarSincronizacaoTelaAgora = () => { void consultar(); };
   consultar();
 }
 
