@@ -230,6 +230,12 @@ export async function sortearGiroRemoto(nome, idGiro = gerarIdSeguro(), perfil =
   };
 }
 
+/** Envia a notificação administrativa fora do caminho crítico do giro. */
+export async function enviarEmailGiroRemoto(emailEnvelope) {
+  if (typeof emailEnvelope !== "string" || !emailEnvelope.includes(".")) return null;
+  return chamarBackendPost({ acao: "enviarEmailGiro", emailEnvelope }, 15000);
+}
+
 /**
  * Converte o instante comum do servidor para o relógio deste dispositivo.
  * O ponto médio da requisição compensa diferenças de relógio e boa parte da

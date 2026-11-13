@@ -9,6 +9,8 @@ const config = JSON.parse(readFileSync(new URL("../config.json", import.meta.url
 const uuid = (valor) => `${valor.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000`;
 
 function backend(gerarUuid = () => uuid(0)) {
+  const propriedades = new Map([["ROULETTE_RELAY_SECRET", "segredo-de-teste-com-mais-de-trinta-e-dois-caracteres"]]);
+  const cache = new Map();
   const contexto = vm.createContext({
     Utilities: {
       getUuid: gerarUuid,
@@ -19,7 +21,18 @@ function backend(gerarUuid = () => uuid(0)) {
       base64EncodeWebSafe: (valor) => Buffer.from(typeof valor === "string" ? valor : valor.map((byte) => byte & 255)).toString("base64url"),
       base64DecodeWebSafe: (valor) => [...Buffer.from(valor, "base64url")],
       newBlob: (bytes) => ({ getDataAsString: () => Buffer.from(bytes).toString("utf8") })
-    }
+    },
+    PropertiesService: { getScriptProperties: () => ({
+      getProperty: (chave) => propriedades.get(chave) || "",
+      setProperty: (chave, valor) => propriedades.set(chave, valor),
+      deleteProperty: (chave) => propriedades.delete(chave)
+    }) },
+    CacheService: { getScriptCache: () => ({
+      put: (chave, valor) => cache.set(chave, valor),
+      get: (chave) => cache.get(chave) || null
+    }) },
+    __properties: propriedades,
+    __cache: cache
   });
   vm.runInContext(codigo, contexto);
   return contexto;
@@ -157,7 +170,7 @@ test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {
   const controle = [];
   let sorteios = 0;
   ctx.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
-  ctx.buscarGiroNoControle = () => null;
+  ctx.buscarGiroRecente = () => null;
   ctx.aplicarLimiteDeGiros = () => {};
   ctx.obterConfigAtivo = () => ({ nome: "Comercial", config });
   ctx.indiceAleatorioSeguro = (quantidade) => { assert.equal(quantidade, config.premios.length); sorteios++; return 2; };
@@ -174,18 +187,16 @@ test("o prêmio enviado pelo visitante não controla o sorteio oficial", () => {
   });
   assert.equal(resultado.dados.premio.id, config.premios[2].id);
   assert.equal(resultado.dados.perfil, "Comercial");
-  assert.equal(linhas.length, 1);
-  assert.deepEqual(Array.from(linhas[0]), ["Teste local", "03/09/2026", config.premios[2].nome]);
-  assert.equal(controle.length, 1);
-  assert.equal(controle[0].length, 4);
-  assert.ok(!controle[0].includes("Teste local"));
+  assert.equal(linhas.length, 0);
+  assert.equal(controle.length, 0);
+  assert.ok(Array.from(ctx.__properties.keys()).some((chave) => chave.startsWith("giro_recente_")));
   assert.equal(sorteios, 1);
 
-  ctx.buscarGiroNoControle = () => resultado.dados;
+  ctx.buscarGiroRecente = () => ({ ...resultado.dados, registradoEm: new Date("2026-09-03T12:00:00Z") });
   ctx.respostaGiroExistente = () => resultado;
   const repetido = ctx.sortearERegistrarGiro({ idGiro: "1234567890abcdef", clienteId: "cliente-local", nome: "Teste local" });
   assert.equal(repetido, resultado);
-  assert.equal(linhas.length, 1);
+  assert.equal(linhas.length, 0);
   assert.equal(sorteios, 1);
 });
 
@@ -194,7 +205,7 @@ test("o servidor sorteia somente dentro do perfil salvo que foi selecionado", ()
   const perfilEscolhido = structuredClone(config);
   perfilEscolhido.premios[0].nome = "Item exclusivo da feira";
   ctx.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
-  ctx.buscarGiroNoControle = () => null;
+  ctx.buscarGiroRecente = () => null;
   ctx.aplicarLimiteDeGiros = () => {};
   ctx.obterPerfilPublico = (nome) => {
     assert.equal(nome, "Feira Korax");
@@ -230,6 +241,20 @@ test("notificação administrativa contém nome, data e prêmio", () => {
   assert.doesNotMatch(enviado[2], /Comercial|1234567890abcdef|Tipo:|Hora:/);
 });
 
+test("e-mail assinado é enviado fora do sorteio e deduplicado", () => {
+  const ctx = backend();
+  ctx.__properties.set("EMAIL_DESTINATARIO", "equipe@example.com");
+  let envios = 0;
+  ctx.MailApp = { sendEmail: () => { envios++; } };
+  const envelope = ctx.assinarEnvelopeEmail({
+    idGiro: "1234567890abcdef", nome: "Maria", data: "16/09/2026",
+    premio: { nome: "Chocolate" }
+  });
+  assert.equal(ctx.enviarEmailGiroAssinado(envelope).duplicado, false);
+  assert.equal(ctx.enviarEmailGiroAssinado(envelope).duplicado, true);
+  assert.equal(envios, 1);
+});
+
 test("a planilha existente recebe a coluna Prêmio sem perder o cabeçalho atual", () => {
   const ctx = backend();
   const valores = [["Nome", "Data", ""]];
@@ -253,7 +278,7 @@ test("requisição repetida preserva resultado sem criar novo registro", () => {
   const ctx = backend();
   const instante = new Date("2026-09-16T12:00:00Z");
   ctx.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
-  ctx.buscarGiroNoControle = () => ({
+  ctx.buscarGiroRecente = () => ({
     idGiro: "1234567890abcdef", premio: config.premios[0],
     perfil: "Comercial", registradoEm: instante
   });

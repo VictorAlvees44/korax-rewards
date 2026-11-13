@@ -573,6 +573,16 @@
     if (!event || event.origin !== "https://telas.telacorporativa.com.br" || event.source !== window.parent) return;
     var data = event.data;
     if (!data || data.type !== "CORPORATE_SCREEN_ROULETTE_WAKE" || !/^[A-Za-z0-9_-]{16,160}$/.test(String(data.eventId || ""))) return;
+    if (data.event && typeof data.event === "object") {
+      var eventId = String(data.event.idEvento || data.event.idGiro || "");
+      var createdAt = Date.parse(data.event.criadoEm || "");
+      var age = new Date().getTime() - createdAt;
+      if (eventId && eventId !== state.lastEventId && !isNaN(createdAt) && age >= -30000 && age <= EVENT_WINDOW_MS) {
+        rememberEvent(eventId);
+        runEvent(data.event);
+        return;
+      }
+    }
     poll();
   }
 

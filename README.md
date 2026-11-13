@@ -1,18 +1,20 @@
 # Korax Rewards — Roleta da Sorte
 
-Roleta corporativa para campanhas e eventos, publicada no GitHub Pages e integrada a um backend Google Apps Script. O servidor escolhe cada resultado de forma autoritativa. O registro operacional no Google Sheets e a notificação por e-mail contêm nome da pessoa, data do giro e prêmio sorteado.
+Roleta corporativa para campanhas e eventos, publicada no GitHub Pages e integrada a um backend Google Apps Script. O servidor escolhe cada resultado de forma autoritativa e envia a notificação operacional por e-mail, sem gravar novos participantes em planilhas.
 
 Produção: <https://victoralvees44.github.io/korax-rewards/>
 
 ## Arquitetura
 
 ```text
-Navegador público ── sorteio/registro ──> Google Apps Script ──> Sheets + e-mail
+Navegador público ── sorteio oficial ──> Google Apps Script ──> e-mail assíncrono
         │                                      │
-        └── escolha de perfil                    ├── perfis no Google Drive
-                                               └── evento temporário do giro
+        ├── escolha de perfil                    ├── perfis no Google Drive
+        └── evento assinado ──> Cloudflare       └── evento temporário de contingência
+                                  │
+                                  └── WebSocket simultâneo para as TVs
 
-Corporate Screen (modo tela) ── consulta evento ──┘
+Corporate Screen (modo tela) ── recebe o mesmo resultado ──┘
 
 Painel /admin ── login privado Google Workspace ──> sessão assinada (8 horas)
 ```
@@ -26,26 +28,28 @@ Painel /admin ── login privado Google Workspace ──> sessão assinada (8 
 
 ## Garantias importantes
 
-- O navegador não escolhe nem informa o prêmio: o Apps Script sorteia, grava e devolve o resultado.
+- O navegador não escolhe nem informa o prêmio: o Apps Script sorteia e devolve o resultado assinado.
 - O menu público lista os perfis salvos. Ao trocar de perfil, o servidor carrega sua configuração e limita o sorteio oficial aos itens desse perfil; o navegador nunca escolhe o resultado.
-- Cada giro possui ID aleatório e uma aba de controle técnica, oculta e sem o nome do participante, impede registros duplicados.
+- Cada giro possui ID aleatório e um registro técnico temporário, sem o nome do participante, que impede resultados duplicados.
 - Se o backend falhar, nenhum resultado não oficial é exibido. A aplicação requer internet para girar.
 - A data registrada vem do servidor, no fuso `America/Sao_Paulo`.
-- Dados gravados no Sheets são neutralizados contra fórmulas maliciosas.
+- Novos giros não alimentam a planilha. As abas antigas são preservadas como histórico e não são alteradas.
 - Alterar, salvar, listar ou excluir perfis exige uma sessão assinada pelo Apps Script depois do login privado com a única conta Workspace autorizada.
 - A chave de assinatura nunca sai das propriedades do Apps Script. O navegador recebe apenas um token temporário de oito horas, mantido no `sessionStorage` da aba.
 - O backend limita cada identificador de navegador a 20 giros por janela de cinco minutos. Esse limite reduz abuso acidental, mas não substitui CAPTCHA/WAF quando o link for divulgado em larga escala.
 - O painel valida a senha em uma chamada curta, carrega só o perfil ativo na entrada e busca a biblioteca completa apenas ao abrir **Perfis**. Lentidão na biblioteca não faz o login parecer inválido.
 - A tela remota recebe ID, perfil e prêmio por um evento temporário. O nome do participante não é transmitido para a Corporate Screen.
+- O evento enviado à Cloudflare usa HMAC-SHA-256. A chave compartilhada fica somente nas propriedades do Apps Script e nos segredos do Worker.
 
 ## Implantar o Google Apps Script
 
-1. Crie ou abra a planilha de registros e acesse **Extensões → Apps Script**.
+1. Abra o projeto do Apps Script e acesse o editor.
 2. Substitua `Code.gs` pelo conteúdo de `google-apps-script/Code.gs`.
 3. Ative a exibição do manifesto nas configurações do editor e substitua `appsscript.json` pelo arquivo do repositório.
 4. Em **Configurações do projeto → Propriedades do script**, mantenha:
 
    - `EMAIL_DESTINATARIO`: um ou mais e-mails separados por vírgula.
+   - `ROULETTE_RELAY_SECRET`: chave aleatória forte, idêntica ao segredo do Worker e nunca colocada no Git.
 
 5. No editor, selecione e execute uma vez a função `configurarAcessoAdmin`. Ela identifica a conta proprietária `@koraxbrasil.com.br`, salva `ADMIN_EMAIL` e cria internamente `ADMIN_TOKEN_SECRET`. Não compartilhe nem copie essa chave.
 
@@ -59,11 +63,11 @@ Painel /admin ── login privado Google Workspace ──> sessão assinada (8 
    - Executar como: **Usuário que acessa o app da Web**.
    - Quem pode acessar: **Somente eu**.
 
-8. Autorize explicitamente o e-mail da conta, Google Drive, planilha e envio de e-mail.
+8. Autorize explicitamente o e-mail da conta, Google Drive e envio de e-mail.
 9. Copie a URL pública terminada em `/exec` para `webhook.url` e a URL privada do login para `admin.authUrl` em `config.js`.
 10. Após alterar o backend, crie uma **Nova versão nas duas implantações**. Salvar `Code.gs` sem implantar uma nova versão não atualiza a produção.
 
-**Importante para esta versão:** o GitHub Pages publica sozinho as mudanças da interface, mas não atualiza o Google Apps Script. Até substituir `Code.gs` e publicar uma nova versão da implantação, a planilha e os e-mails continuarão usando o formato antigo de registro.
+**Importante:** o GitHub Pages publica sozinho as mudanças da interface, mas não atualiza o Google Apps Script. Interface, Worker e Apps Script devem ser atualizados como uma única versão compatível.
 
 ### Diagnóstico do backend
 
@@ -110,9 +114,9 @@ Na playlist da TV, cadastre uma página web com exatamente o mesmo link usado no
 
 Quando a Corporate Screen incorpora esse link na playlist, a página reconhece automaticamente o contexto de TV e aguarda os giros de qualquer perfil. No notebook, o mesmo endereço continua exibindo a escolha de perfil e o botão de giro. O perfil e o resultado sorteados no notebook são reproduzidos na TV sem registrar novamente o participante.
 
-Depois que o backend confirma o giro, o notebook envia apenas o ID aleatório do evento ao relay do Corporate Screen. As TVs conectadas por WebSocket recebem um aviso imediato e consultam o resultado oficial no Apps Script; prêmio e nome não são confiados ao relay. O polling de 900 ms continua ativo como contingência. Para manter o alinhamento mesmo com a latência do Apps Script, o backend publica um início comum 2 segundos à frente, sem a antiga margem adicional de 3 segundos no navegador.
+Depois que o backend confirma o giro, o notebook envia ao Corporate Screen um envelope HMAC assinado. O Worker valida a assinatura uma vez e transmite o mesmo resultado às TVs Rodrigo, Renato e Marcelo por WebSocket. Nenhuma TV precisa consultar o Google antes de começar; o polling de 900 ms permanece apenas como contingência.
 
-Cada giro recebe do servidor um horário único e os clientes acrescentam uma margem comum de recepção, totalizando aproximadamente sete segundos de preparação. Notebook e todas as TVs corrigem a diferença de relógio pela resposta do servidor e aguardam esse mesmo instante antes de animar. Assim, telas conectadas começam juntas mesmo que uma delas receba o evento antes da outra. Uma tela que estiver offline ou receber o evento somente depois do horário inicia assim que reconectar.
+O Worker define um início comum aproximadamente um segundo à frente e cada player converte esse instante para o relógio local já calibrado pelo canal de sincronização. Em conexão normal, a expectativa é iniciar em cerca de 1–2 segundos após a confirmação do sorteio, com diferença de poucos décimos entre as TVs. Hardware antigo, renderização e Wi-Fi impedem garantia de sincronismo de quadro, mas não há mais o atraso variável de três consultas ao Apps Script. Uma tela offline continua recuperando o evento pela contingência ao reconectar.
 
 O mesmo endereço também reconhece automaticamente navegadores antigos de TVs Samsung/LG e carrega um receptor ES5 leve. Não é necessário cadastrar um link diferente nem acrescentar parâmetros na playlist.
 
@@ -124,11 +128,11 @@ O modo TV solicita tela cheia automaticamente e também mostra o botão `TELA CH
 
 A tela da playlist deve permanecer carregada antes do giro. O player guarda localmente o último evento exibido e aceita eventos recentes depois de um recarregamento, evitando perder o giro durante a atualização de conteúdo da TV. As URLs antigas com `?modo=tela` continuam compatíveis.
 
-## Planilhas e idempotência
+## E-mail e idempotência
 
-Os novos giros são gravados em abas no formato `Registros - MM-AAAA`, com três colunas: `Nome`, `Data` e `Prêmio`. As abas existentes recebem automaticamente a coluna `Prêmio`; os registros antigos permanecem intactos e podem ficar com essa coluna vazia. A aba técnica oculta `_Controle_Giros_v2` guarda ID aleatório, prêmio, perfil e instante do giro, mas **não guarda o nome**. Ela permite devolver o mesmo resultado se uma solicitação for repetida, sem criar outra linha ou enviar outro e-mail.
+O sorteio responde antes de enviar e-mail. O navegador dispara uma segunda requisição assinada, e o Apps Script deduplica a notificação para não enviar duas vezes em uma repetição de rede. O e-mail contém nome, data e prêmio; esses dados não passam pela Cloudflare nem chegam às TVs.
 
-As abas antigas não são apagadas nem modificadas automaticamente. Elas podem conter as colunas anteriores; revise sua retenção e arquivamento separadamente.
+O controle técnico recente usa propriedades temporárias do Apps Script, sem o nome do participante. As planilhas e abas antigas não são apagadas nem modificadas automaticamente; permanecem disponíveis como histórico.
 
 No navegador, o histórico local antigo é convertido para `Nome` e `Data` na primeira abertura após a atualização; o armazenamento antigo, que continha campos extras, é removido depois da conversão.
 

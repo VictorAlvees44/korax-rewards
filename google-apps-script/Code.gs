@@ -5,6 +5,7 @@
  *   ADMIN_EMAIL         unica conta Workspace autorizada no painel
  *   ADMIN_TOKEN_SECRET  chave interna criada por configurarAcessoAdmin()
  *   EMAIL_DESTINATARIO  um ou mais e-mails separados por virgula
+ *   ROULETTE_RELAY_SECRET segredo compartilhado somente com o Worker
  */
 
 // A planilha operacional registra os dados necessários para entregar o prêmio.
@@ -18,6 +19,9 @@ var TAMANHO_MAX_REQUISICAO = 8 * 1024 * 1024;
 var LIMITE_GIROS_JANELA = 20;
 var SEGUNDOS_JANELA_GIROS = 300;
 var SEGUNDOS_EVENTO_TELA = 600;
+var SEGUNDOS_GIRO_RECENTE = 2 * 24 * 60 * 60;
+var CHAVE_INDICE_GIROS_RECENTES = "giros_recentes_v1";
+var MAXIMO_GIROS_RECENTES = 80;
 // Janela curta para o aviso em tempo real chegar às TVs e cada uma confirmar
 // o evento oficial neste backend. O polling de contingência continua ativo.
 var ATRASO_INICIO_GIRO_MS = 2000;
@@ -48,7 +52,8 @@ function doGet(e) {
       return respostaJson({
         status: "sucesso",
         servico: "Roleta da Sorte Corporativa",
-        configurado: Boolean(props.getProperty("ADMIN_EMAIL") && props.getProperty("ADMIN_TOKEN_SECRET") && props.getProperty("EMAIL_DESTINATARIO"))
+        configurado: Boolean(props.getProperty("ADMIN_EMAIL") && props.getProperty("ADMIN_TOKEN_SECRET")
+          && props.getProperty("EMAIL_DESTINATARIO") && props.getProperty("ROULETTE_RELAY_SECRET"))
       });
     }
     throw new Error("Ação GET inválida.");
@@ -71,6 +76,7 @@ function doPost(e) {
       respostaGiro.servidorAgora = Date.now();
       return respostaJson(respostaGiro);
     }
+    if (acao === "enviarEmailGiro") return respostaJson(enviarEmailGiroAssinado(corpo.emailEnvelope));
     if (acao === "autenticarAdmin") {
       exigirAdmin(corpo.adminToken);
       return respostaJson({ status: "sucesso" });
@@ -331,7 +337,7 @@ function sortearERegistrarGiro(corpo) {
   var resultado;
 
   try {
-    var existente = buscarGiroNoControle(idGiro);
+    var existente = buscarGiroRecente(idGiro);
     if (existente) {
       var repetido = respostaGiroExistente(existente, nome);
       var eventoRepetido = tentarPublicarEventoGiro(repetido.dados);
@@ -339,7 +345,9 @@ function sortearERegistrarGiro(corpo) {
         repetido.dados.idEvento = eventoRepetido.idEvento;
         repetido.dados.criadoEm = eventoRepetido.criadoEm;
         repetido.dados.iniciarEm = eventoRepetido.iniciarEm;
+        repetido.dados.relayEnvelope = assinarEnvelopeRelay(eventoRepetido);
       }
+      repetido.dados.emailEnvelope = assinarEnvelopeEmail(repetido.dados);
       return repetido;
     }
 
@@ -353,30 +361,136 @@ function sortearERegistrarGiro(corpo) {
     var agora = new Date();
     var fuso = Session.getScriptTimeZone() || "America/Sao_Paulo";
     var data = Utilities.formatDate(agora, fuso, "dd/MM/yyyy");
-    var aba = obterAbaRegistrosDoMes(agora);
-    garantirCabecalhoAtual(aba);
-    aba.appendRow([textoSeguroPlanilha(nome), data, textoSeguroPlanilha(premio.nome)]);
-    var controle = obterAbaControle();
-    controle.appendRow([idGiro, JSON.stringify(premio), textoSeguroPlanilha(ativo.nome), agora]);
     resultado = { idGiro: idGiro, nome: nome, premio: premio, premios: premios, perfil: ativo.nome, data: data };
+    registrarGiroRecente(resultado, agora);
   } finally {
     lock.releaseLock();
   }
 
-  try {
-    enviarEmailNotificacao(resultado);
-  } catch (erroEmail) {
-    console.warn("Falha no e-mail administrativo: " + String(erroEmail.message || erroEmail).substring(0, 160));
-  }
-  // O evento é publicado por último para que notebook e TVs recebam tempo
-  // suficiente para aguardar o mesmo instante de início.
+  // Publicação e resposta vêm antes do e-mail. O navegador dispara a
+  // notificação em uma segunda requisição, sem bloquear notebook ou TVs.
   var evento = tentarPublicarEventoGiro(resultado);
   if (evento) {
     resultado.idEvento = evento.idEvento;
     resultado.criadoEm = evento.criadoEm;
     resultado.iniciarEm = evento.iniciarEm;
+    resultado.relayEnvelope = assinarEnvelopeRelay(evento);
   }
+  resultado.emailEnvelope = assinarEnvelopeEmail(resultado);
   return { status: "sucesso", dados: resultado };
+}
+
+function chaveGiroRecente(idGiro) {
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(idGiro), Utilities.Charset.UTF_8);
+  var sufixo = digest.slice(0, 16).map(function (byte) { return (byte + 256).toString(16).slice(-2); }).join("");
+  return "giro_recente_" + sufixo;
+}
+
+function buscarGiroRecente(idGiro) {
+  var texto = PropertiesService.getScriptProperties().getProperty(chaveGiroRecente(idGiro));
+  if (!texto) return null;
+  try {
+    var giro = JSON.parse(texto);
+    var registradoEm = new Date(giro.registradoEm);
+    if (giro.idGiro !== idGiro || !giro.premio || !giro.perfil || !isFinite(registradoEm.getTime())
+      || Date.now() - registradoEm.getTime() > SEGUNDOS_GIRO_RECENTE * 1000) return null;
+    giro.registradoEm = registradoEm;
+    return giro;
+  } catch (ignorado) {
+    return null;
+  }
+}
+
+function registrarGiroRecente(resultado, agora) {
+  var props = PropertiesService.getScriptProperties();
+  var chave = chaveGiroRecente(resultado.idGiro);
+  props.setProperty(chave, JSON.stringify({
+    idGiro: resultado.idGiro,
+    premio: resultado.premio,
+    premios: resultado.premios,
+    perfil: resultado.perfil,
+    data: resultado.data,
+    registradoEm: agora.toISOString()
+  }));
+  var indice;
+  try { indice = JSON.parse(props.getProperty(CHAVE_INDICE_GIROS_RECENTES) || "[]"); }
+  catch (ignorado) { indice = []; }
+  if (!Array.isArray(indice)) indice = [];
+  indice = indice.filter(function (item) {
+    return item && item.chave !== chave && isFinite(Number(item.criadoEm))
+      && Date.now() - Number(item.criadoEm) <= SEGUNDOS_GIRO_RECENTE * 1000;
+  });
+  indice.unshift({ chave: chave, criadoEm: agora.getTime() });
+  var removidos = indice.splice(MAXIMO_GIROS_RECENTES);
+  for (var i = 0; i < removidos.length; i++) {
+    props.deleteProperty(removidos[i].chave);
+    props.deleteProperty(removidos[i].chave.replace("giro_recente_", "email_giro_"));
+  }
+  props.setProperty(CHAVE_INDICE_GIROS_RECENTES, JSON.stringify(indice));
+}
+
+function assinarEnvelopeRelay(evento) {
+  return assinarEnvelope({
+    kind: "roulette", v: 1,
+    idGiro: evento.idGiro,
+    idEvento: evento.idEvento,
+    perfil: evento.perfil,
+    premio: evento.premio,
+    premios: evento.premios,
+    criadoEm: evento.criadoEm
+  });
+}
+
+function assinarEnvelopeEmail(resultado) {
+  return assinarEnvelope({
+    kind: "email", v: 1,
+    idGiro: resultado.idGiro,
+    nome: resultado.nome,
+    data: resultado.data,
+    premio: resultado.premio && resultado.premio.nome,
+    criadoEm: new Date().toISOString()
+  });
+}
+
+function assinarEnvelope(payload) {
+  var segredo = PropertiesService.getScriptProperties().getProperty("ROULETTE_RELAY_SECRET");
+  if (!segredo) throw new Error("A transmissão segura da roleta ainda não foi configurada.");
+  var corpo = base64UrlEncode(JSON.stringify(payload));
+  var bytes = Utilities.computeHmacSha256Signature(corpo, segredo, Utilities.Charset.UTF_8);
+  return corpo + "." + Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, "");
+}
+
+function verificarEnvelope(envelope, tipo) {
+  var partes = String(envelope || "").split(".");
+  if (partes.length !== 2 || !partes[0] || !partes[1]) throw new Error("Notificação inválida.");
+  var segredo = PropertiesService.getScriptProperties().getProperty("ROULETTE_RELAY_SECRET");
+  if (!segredo) throw new Error("A transmissão segura da roleta ainda não foi configurada.");
+  var assinatura = Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(partes[0], segredo, Utilities.Charset.UTF_8)
+  ).replace(/=+$/g, "");
+  if (!compararConstante(partes[1], assinatura)) throw new Error("Notificação inválida.");
+  var payload = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(partes[0])).getDataAsString("UTF-8"));
+  if (!payload || payload.kind !== tipo || payload.v !== 1) throw new Error("Notificação inválida.");
+  var criadoEm = Date.parse(payload.criadoEm || "");
+  if (!isFinite(criadoEm) || Math.abs(Date.now() - criadoEm) > 5 * 60 * 1000) throw new Error("Notificação expirada.");
+  return payload;
+}
+
+function enviarEmailGiroAssinado(envelope) {
+  var payload = verificarEnvelope(envelope, "email");
+  validarIdGiro(payload.idGiro);
+  var cache = CacheService.getScriptCache();
+  var props = PropertiesService.getScriptProperties();
+  var chave = chaveGiroRecente(payload.idGiro).replace("giro_recente_", "email_giro_");
+  if (cache.get(chave) || props.getProperty(chave)) return { status: "sucesso", duplicado: true };
+  enviarEmailNotificacao({
+    nome: normalizarTexto(payload.nome, "nome", 60, true),
+    data: normalizarTexto(payload.data, "data", 20, true),
+    premio: { nome: normalizarTexto(payload.premio, "prêmio", 80, true) }
+  });
+  cache.put(chave, "1", SEGUNDOS_EVENTO_TELA);
+  props.setProperty(chave, new Date().toISOString());
+  return { status: "sucesso", duplicado: false };
 }
 
 /**

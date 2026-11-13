@@ -8,12 +8,12 @@
 import {
   Estado, Roleta, Confete,
   obterConfigParaExibir, listarPerfisPublicosRemoto, buscarPerfilPublicoRemoto,
-  buscarUltimoGiroRemoto, sortearGiroRemoto, gerarIdSeguro, girarRoleta,
+  buscarUltimoGiroRemoto, sortearGiroRemoto, enviarEmailGiroRemoto, gerarIdSeguro, girarRoleta,
   validarConfiguracao, adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela,
   normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela,
   calcularAtrasoSincronizado
-} from "./core.js?v=20261106-fast1";
+} from "./core.js?v=20261113-sync2";
 
 const parametros = new URLSearchParams(location.search);
 const FORCAR_MODO_LEGADO = parametros.get("legacy") === "1" || window.KORAX_MODO_LEGADO_ATIVO === true;
@@ -38,24 +38,56 @@ function identificadorEvento(evento) {
   return String(evento?.idEvento || evento?.idGiro || "");
 }
 
-function avisarCorporateScreen(evento) {
+async function avisarCorporateScreen(evento) {
   const idEvento = identificadorEvento(evento);
-  if (!/^[A-Za-z0-9_-]{16,160}$/.test(idEvento) || typeof fetch !== "function") return;
+  if (!/^[A-Za-z0-9_-]{16,160}$/.test(idEvento) || typeof fetch !== "function") return null;
+  const clienteEnviadoEm = Date.now();
   try {
-    void fetch(URL_AVISO_CORPORATE_SCREEN, {
+    const resposta = await fetch(URL_AVISO_CORPORATE_SCREEN, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=UTF-8" },
-      body: idEvento,
+      body: typeof evento.relayEnvelope === "string" ? evento.relayEnvelope : idEvento,
       mode: "cors",
       keepalive: true
-    }).catch(() => {});
-  } catch (ignorado) {}
+    });
+    if (!resposta.ok) return null;
+    const corpo = await resposta.json();
+    const wake = corpo && corpo.rouletteWake;
+    if (!wake || !wake.event) return null;
+    const clienteRecebidoEm = Date.now();
+    const servidorAgora = Date.parse(wake.serverTime || wake.issuedAt || "");
+    return {
+      ...wake.event,
+      servidorRecebeuEm: servidorAgora,
+      servidorAgora,
+      clienteEnviadoEm,
+      clienteRecebidoEm
+    };
+  } catch (ignorado) {
+    return null;
+  }
 }
 
 function receberAvisoCorporateScreen(evento) {
   if (!MODO_TELA || evento.origin !== ORIGEM_CORPORATE_SCREEN || evento.source !== window.parent) return;
   const dados = evento.data;
   if (!dados || dados.type !== TIPO_AVISO_CORPORATE_SCREEN || !/^[A-Za-z0-9_-]{16,160}$/.test(String(dados.eventId || ""))) return;
+  if (dados.event && typeof dados.event === "object") {
+    const id = identificadorEvento(dados.event);
+    const criadoEm = Date.parse(dados.event.criadoEm || "");
+    if (id && id !== ultimoEventoId && Number.isFinite(criadoEm) && Math.abs(Date.now() - criadoEm) <= JANELA_EVENTO_TELA_MS) {
+      marcarEventoVisto(dados.event.perfil || Estado.nomePerfilAtivo, id);
+      prepararRoletaParaResultado(dados.event);
+      void aguardarInicioSincronizado(dados.event).then(() => {
+        if (Estado.girando) return;
+        Estado.girando = true;
+        tocarSom("audioGiro");
+        const duracaoMs = Estado.config.roleta?.duracaoGiroMs || 4800;
+        girarRoleta(dados.event.premio, duracaoMs, () => finalizarGiroLocal(dados.event));
+      });
+      return;
+    }
+  }
   if (typeof consultarSincronizacaoTelaAgora === "function") consultarSincronizacaoTelaAgora();
 }
 
@@ -266,13 +298,14 @@ async function iniciarFluxoDeGiro(nomeParticipante) {
     } catch (primeiroErro) {
       registro = await sortearGiroRemoto(nomeParticipante, idGiro, Estado.nomePerfilAtivo);
     }
-    prepararRoletaParaResultado(registro);
-    avisarCorporateScreen(registro);
+    const eventoSincronizado = await avisarCorporateScreen(registro) || registro;
+    prepararRoletaParaResultado(eventoSincronizado);
+    void enviarEmailGiroRemoto(registro.emailEnvelope).catch(() => {});
     mostrarToast("Giro confirmado • sincronizando com as TVs…");
-    await aguardarInicioSincronizado(registro);
+    await aguardarInicioSincronizado(eventoSincronizado);
     tocarSom("audioGiro");
     const duracaoMs = Estado.config.roleta?.duracaoGiroMs || 4800;
-    girarRoleta(registro.premio, duracaoMs, () => finalizarGiroLocal(registro));
+    girarRoleta(eventoSincronizado.premio, duracaoMs, () => finalizarGiroLocal(registro));
   } catch (erro) {
     Estado.girando = false;
     document.getElementById("btnGirar").disabled = false;
