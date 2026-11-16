@@ -73,3 +73,16 @@ test("o giro avisa o Corporate Screen e mantém o polling como contingência", (
   assert.match(moderno, /addEventListener\("message", receberAvisoCorporateScreen\)/);
   assert.match(moderno, /setTimeout\(consultar, 900\)/);
 });
+
+test("a TV preserva a descrição do resultado mesmo quando a lista de fatias é compacta", () => {
+  const trecho = legacy.slice(legacy.indexOf("  function runEvent(event) {"), legacy.indexOf("  function rememberEvent(id) {"));
+  let resultado;
+  const contexto = {
+    state: { profile: "Comercial", config: { premios: [], roleta: {} }, angle: 0, spinning: false },
+    drawWheel() {}, synchronizedDelay: () => 0, synchronizedStartAt: () => Date.now(),
+    window: { setTimeout: (callback) => callback() }, stopAudio() {}, playAudio() {},
+    animateSpin: (premio, done) => { resultado = premio; done(); }, showResult() {}
+  };
+  vm.runInNewContext(trecho + ';runEvent({perfil:"Comercial",premio:{id:"a",nome:"Chocolate",descricao:"Retirar no comercial"},premios:[{id:"a",nome:"Chocolate"},{id:"b",nome:"Café"}]});', contexto);
+  assert.equal(resultado.descricao, "Retirar no comercial");
+});

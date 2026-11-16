@@ -481,14 +481,6 @@
     state.resultTimer = window.setTimeout(function () { overlay.style.display = "none"; }, 12000);
   }
 
-  function findPrize(prize, prizes) {
-    var list = prizes || [];
-    for (var index = 0; index < list.length; index += 1) {
-      if (String(list[index].id) === String(prize.id)) return list[index];
-    }
-    return prize;
-  }
-
   function synchronizedStartAt(event) {
     var startAt = Number(event && event.iniciarEm);
     if (!isFinite(startAt) || startAt <= 0) return 0;
@@ -512,13 +504,12 @@
   function runEvent(event) {
     if (!event || !event.premio || !event.perfil || state.spinning) return;
     function start() {
-      var configPrizes = wheelPrizes();
       if (event.premios && event.premios.length >= 2) state.config.premios = event.premios;
       state.config.roleta = state.config.roleta || {};
       if (Number(event.duracaoGiroMs) >= 2000) state.config.roleta.duracaoGiroMs = Number(event.duracaoGiroMs);
       if (Number(event.voltasMinimas) >= 2) state.config.roleta.voltasMinimas = Number(event.voltasMinimas);
       state.angle = 0;
-      var selected = findPrize(event.premio, state.config.premios || configPrizes);
+      var selected = event.premio;
       drawWheel(state.angle);
       state.spinning = true;
       var delay = synchronizedDelay(event);

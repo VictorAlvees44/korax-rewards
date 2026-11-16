@@ -116,7 +116,9 @@ Quando a Corporate Screen incorpora esse link na playlist, a página reconhece a
 
 Depois que o backend confirma o giro, o notebook envia ao Corporate Screen um envelope HMAC assinado. O Worker valida a assinatura uma vez e transmite o mesmo resultado às TVs Rodrigo, Renato e Marcelo por WebSocket. Nenhuma TV precisa consultar o Google antes de começar; o polling de 900 ms permanece apenas como contingência.
 
-O Worker define um início comum aproximadamente um segundo à frente e cada player converte esse instante para o relógio local já calibrado pelo canal de sincronização. Em conexão normal, a expectativa é iniciar em cerca de 1–2 segundos após a confirmação do sorteio, com diferença de poucos décimos entre as TVs. Hardware antigo, renderização e Wi-Fi impedem garantia de sincronismo de quadro, mas não há mais o atraso variável de três consultas ao Apps Script. Uma tela offline continua recuperando o evento pela contingência ao reconectar.
+O Apps Script define um único início 1,2 segundo após publicar o resultado, e esse horário assinado é preservado tanto no WebSocket quanto na contingência. Cada player converte o instante para seu relógio local. Notebook e TVs usam a mesma duração, número de voltas e curva de animação. Se o evento chegar atrasado, a animação avança até o ponto correspondente ao tempo decorrido, sem reiniciar do zero. O tempo entre clicar e ver o giro também inclui a resposta do Google, a rede e a renderização; precisa ser medido nos aparelhos reais.
+
+O sorteio usa cache curto do perfil para evitar reler arquivos do Drive em cada giro. O e-mail é enviado em outra requisição, e o fluxo atual não grava novas linhas na planilha. Após atualizar o sistema, recarregue uma vez a página do notebook e o navegador de cada TV para carregar o novo receptor. Deixe a playlist da roleta pronta nas telas antes de iniciar o giro.
 
 O mesmo endereço também reconhece automaticamente navegadores antigos de TVs Samsung/LG e carrega um receptor ES5 leve. Não é necessário cadastrar um link diferente nem acrescentar parâmetros na playlist.
 
