@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme, carregarHistorico, adicionarHistorico, CHAVE_HISTORICO, normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela, calcularAtrasoSincronizado } from "../core.js";
+import { validarConfiguracao, sortearPremioAleatorio, calcularAnguloFinal, gerarCorAleatoria, corrigirCoresRepetidas, sortearIndiceUniforme, carregarHistorico, adicionarHistorico, CHAVE_HISTORICO, normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela, calcularAtrasoSincronizado, obterInicioLocalSincronizado, girarRoleta, Estado, Roleta } from "../core.js";
 
 const config = JSON.parse(readFileSync(new URL("../config.json", import.meta.url), "utf8"));
 
@@ -98,6 +98,46 @@ test("o cálculo de ângulo produz valor finito para todos os prêmios", () => {
   for (const premio of config.premios) {
     assert.equal(Number.isFinite(calcularAnguloFinal(config.premios, premio)), true);
   }
+});
+
+test("o giro sincronizado tem o mesmo destino em dispositivos com fontes aleatórias distintas", (t) => {
+  for (const premio of config.premios) {
+    const mock = t.mock.method(Math, "random", () => 0);
+    const primeiro = calcularAnguloFinal(config.premios, premio, true);
+    mock.mock.restore();
+    const outro = t.mock.method(Math, "random", () => 0.99);
+    assert.equal(calcularAnguloFinal(config.premios, premio, true), primeiro);
+    outro.mock.restore();
+  }
+});
+
+test("um aviso atrasado avança a animação até o instante atual do giro", (t) => {
+  const anterior = { config: Estado.config, angulo: Estado.anguloAtual, raf: globalThis.requestAnimationFrame };
+  let quadro;
+  let finalizou = false;
+  t.after(() => {
+    Estado.config = anterior.config;
+    Estado.anguloAtual = anterior.angulo;
+    if (anterior.raf === undefined) delete globalThis.requestAnimationFrame;
+    else globalThis.requestAnimationFrame = anterior.raf;
+  });
+  Estado.config = structuredClone(config);
+  Estado.anguloAtual = 0;
+  globalThis.requestAnimationFrame = (callback) => { quadro = callback; };
+  t.mock.method(Date, "now", () => 50000);
+  t.mock.method(performance, "now", () => 1000);
+  t.mock.method(Roleta, "aplicarRotacao", () => {});
+  const premio = config.premios[0];
+  girarRoleta(premio, 4000, () => { finalizou = true; }, 49000);
+  quadro(1000);
+  const volta = 2 * Math.PI;
+  const destino = ((-Math.PI / 2 - calcularAnguloFinal(config.premios, premio, true)) % volta + volta) % volta;
+  const esperado = ((config.roleta.voltasMinimas || 6) * volta + destino) * (1 - Math.pow(0.75, 5));
+  assert.ok(Math.abs(Estado.anguloAtual - esperado) < 1e-9);
+  assert.equal(finalizou, false);
+  quadro(4000);
+  assert.equal(finalizou, true);
+  assert.equal(obterInicioLocalSincronizado({ iniciarEm: 49000 }), 49000);
 });
 
 test("100 perfis completos recebem 50 cores válidas sem repetição", () => {

@@ -134,7 +134,7 @@ test("o evento da tela transmite o prêmio, mas nunca o nome da pessoa", () => {
   assert.equal(evento.idGiro, "1234567890abcdef");
   assert.equal(evento.premio.id, config.premios[0].id);
   assert.equal(evento.premios.length, config.premios.length);
-  assert.equal(evento.iniciarEm - Date.parse(evento.criadoEm), 2000);
+  assert.equal(evento.iniciarEm - Date.parse(evento.criadoEm), 1200);
   assert.equal(evento.idEvento, `${evento.idGiro}_${evento.iniciarEm}`);
   assert.equal("nome" in evento, false);
   assert.doesNotMatch(JSON.stringify(evento), /Nome que não pode vazar/);
@@ -225,6 +225,24 @@ test("o servidor sorteia somente dentro do perfil salvo que foi selecionado", ()
   });
   assert.equal(resultado.dados.perfil, "Feira Korax");
   assert.equal(resultado.dados.premio.nome, "Item exclusivo da feira");
+});
+
+test("o cache evita reler o Drive a cada giro e o registro persistente cabe com 50 prêmios", () => {
+  const ctx = backend();
+  let leituras = 0;
+  const grande = structuredClone(config);
+  grande.premios = Array.from({ length: 50 }, (_, indice) => ({
+    id: `p${indice}`, nome: `Prêmio ${indice}`, cor: "#112233", descricao: "x".repeat(240)
+  }));
+  ctx.obterPerfilPublico = (nome) => { leituras++; return { nome, config: grande }; };
+  ctx.obterPerfilParaGiro("Comercial");
+  ctx.obterPerfilParaGiro("Comercial");
+  assert.equal(leituras, 1);
+  ctx.registrarGiroRecente({ idGiro: "1234567890abcdef", premio: grande.premios[0], premios: grande.premios,
+    perfil: "Comercial", data: "16/11/2026", duracaoGiroMs: 4800, voltasMinimas: 6 }, new Date());
+  const registro = ctx.__properties.get(ctx.chaveGiroRecente("1234567890abcdef"));
+  assert.ok(Buffer.byteLength(registro) < 9000);
+  assert.equal(ctx.buscarGiroRecente("1234567890abcdef").premios.length, 50);
 });
 
 test("notificação administrativa contém nome, data e prêmio", () => {

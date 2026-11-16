@@ -27,6 +27,7 @@
   var POLL_INTERVAL_MS = 900;
   var state = {
     config: null,
+    pendingWake: null,
     profile: "",
     angle: 0,
     spinning: false,
@@ -439,12 +440,12 @@
     return state.angle + turns * Math.PI * 2 + delta;
   }
 
-  function animateSpin(prize, done) {
+  function animateSpin(prize, done, startAtLocal) {
     var canvas = byId("roletaLegadaSvg") || byId("canvasRoleta");
     var startAngle = state.angle;
     var finalAngle = calculateFinalAngle(prize);
     var duration = state.config && state.config.roleta && Number(state.config.roleta.duracaoGiroMs) || 4800;
-    var started = new Date().getTime();
+    var started = Number(startAtLocal) > 0 ? Math.min(new Date().getTime(), Number(startAtLocal)) : new Date().getTime();
     var raf = window.requestAnimationFrame || window.webkitRequestAnimationFrame || function (callback) { return window.setTimeout(function () { callback(new Date().getTime()); }, 16); };
     function frame(timestamp) {
       var now = typeof timestamp === "number" ? timestamp : new Date().getTime();
@@ -488,7 +489,7 @@
     return prize;
   }
 
-  function synchronizedDelay(event) {
+  function synchronizedStartAt(event) {
     var startAt = Number(event && event.iniciarEm);
     if (!isFinite(startAt) || startAt <= 0) return 0;
     var serverReceivedAt = Number(event.servidorRecebeuEm);
@@ -501,7 +502,11 @@
     } else if (isFinite(serverNow) && serverNow > 0 && isFinite(sentAt) && isFinite(receivedAt) && receivedAt >= sentAt) {
       clockDifference = serverNow - ((sentAt + receivedAt) / 2);
     }
-    return Math.max(0, Math.min(10000, Math.round(startAt - clockDifference - new Date().getTime())));
+    return startAt - clockDifference;
+  }
+
+  function synchronizedDelay(event) {
+    return Math.max(0, Math.min(10000, Math.round(synchronizedStartAt(event) - new Date().getTime())));
   }
 
   function runEvent(event) {
@@ -509,10 +514,17 @@
     function start() {
       var configPrizes = wheelPrizes();
       if (event.premios && event.premios.length >= 2) state.config.premios = event.premios;
+      state.config.roleta = state.config.roleta || {};
+      if (Number(event.duracaoGiroMs) >= 2000) state.config.roleta.duracaoGiroMs = Number(event.duracaoGiroMs);
+      if (Number(event.voltasMinimas) >= 2) state.config.roleta.voltasMinimas = Number(event.voltasMinimas);
+      state.angle = 0;
       var selected = findPrize(event.premio, state.config.premios || configPrizes);
       drawWheel(state.angle);
       state.spinning = true;
       var delay = synchronizedDelay(event);
+      var startAtLocal = synchronizedStartAt(event) || new Date().getTime();
+      // Se o evento já chegou atrasado, usa o horário original para alcançar
+      // o mesmo ponto da animação em vez de iniciar um giro novo do zero.
       if (delay > 0) setStatus("Giro sincronizado - " + escapeHtml(state.profile), true);
       window.setTimeout(function () {
         stopAudio("audioVitoria");
@@ -523,10 +535,10 @@
           playAudio(selected.positivo === false ? "audioDerrota" : "audioVitoria");
           showResult(selected);
           state.spinning = false;
-        });
+        }, startAtLocal);
       }, delay);
     }
-    if (String(event.perfil) === String(state.profile)) return start();
+    if (String(event.perfil) === String(state.profile) || (event.premios && event.premios.length >= 2)) { state.profile = String(event.perfil); return start(); }
     request("perfilPublico", { nome: event.perfil }, function (error, payload) {
       if (error || !payload.dados || !payload.dados.config) return;
       applyConfig(payload.dados.nome || event.perfil, payload.dados.config);
@@ -556,7 +568,7 @@
         var eventId = event && String(event.idEvento || event.idGiro || "");
         if (event && eventId && eventId !== state.lastEventId) {
           var createdAt = Date.parse(event.criadoEm || "");
-          var age = new Date().getTime() - createdAt;
+          var age = (Number(payload.servidorAgora) || new Date().getTime()) - createdAt;
           event.servidorRecebeuEm = Number(payload.servidorRecebeuEm) || 0;
           event.servidorAgora = Number(payload.servidorAgora) || 0;
           event.clienteEnviadoEm = requestedAt;
@@ -573,6 +585,7 @@
     if (!event || event.origin !== "https://telas.telacorporativa.com.br" || event.source !== window.parent) return;
     var data = event.data;
     if (!data || data.type !== "CORPORATE_SCREEN_ROULETTE_WAKE" || !/^[A-Za-z0-9_-]{16,160}$/.test(String(data.eventId || ""))) return;
+    if (!state.config) { state.pendingWake = event; return; }
     if (data.event && typeof data.event === "object") {
       var eventId = String(data.event.idEvento || data.event.idGiro || "");
       var createdAt = Date.parse(data.event.criadoEm || "");
@@ -586,17 +599,27 @@
     poll();
   }
 
+  function flushPendingWake() {
+    if (!state.pendingWake) return;
+    var event = state.pendingWake;
+    state.pendingWake = null;
+    receiveCorporateScreenWake(event);
+  }
+
   function loadInitialConfig() {
     setStatus("Conectando a roleta...", false);
     request("configAtivo", {}, function (error, payload) {
       if (error || !payload.dados || !payload.dados.config) {
         applyConfig("Roleta Comercial", window.CONFIG_PADRAO || {});
         setStatus("Reconectando a roleta...", false);
+        restoreEvent();
+        flushPendingWake();
         poll();
         return;
       }
       applyConfig(payload.dados.nome || "Roleta Comercial", payload.dados.config);
       restoreEvent();
+      flushPendingWake();
       poll();
     });
   }

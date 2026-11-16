@@ -24,7 +24,7 @@ var CHAVE_INDICE_GIROS_RECENTES = "giros_recentes_v1";
 var MAXIMO_GIROS_RECENTES = 80;
 // Janela curta para o aviso em tempo real chegar às TVs e cada uma confirmar
 // o evento oficial neste backend. O polling de contingência continua ativo.
-var ATRASO_INICIO_GIRO_MS = 2000;
+var ATRASO_INICIO_GIRO_MS = 1200;
 var CHAVE_EVENTO_TELA_GLOBAL = "tela_global_v1";
 var CHAVE_EVENTO_PERSISTENTE_GLOBAL = "evento_tela_global_v1";
 var SEGUNDOS_SESSAO_ADMIN = 8 * 60 * 60;
@@ -52,6 +52,8 @@ function doGet(e) {
       return respostaJson({
         status: "sucesso",
         servico: "Roleta da Sorte Corporativa",
+        protocoloTela: 3,
+        atrasoInicioMs: ATRASO_INICIO_GIRO_MS,
         configurado: Boolean(props.getProperty("ADMIN_EMAIL") && props.getProperty("ADMIN_TOKEN_SECRET")
           && props.getProperty("EMAIL_DESTINATARIO") && props.getProperty("ROULETTE_RELAY_SECRET"))
       });
@@ -241,6 +243,7 @@ function salvarPerfil(nome, config) {
   } finally {
     lock.releaseLock();
   }
+  atualizarCacheGiro({ nome: nome, config: config }, false);
   return { status: "sucesso" };
 }
 
@@ -315,6 +318,7 @@ function ativarPerfil(nome, config) {
   } finally {
     lock.releaseLock();
   }
+  atualizarCacheGiro({ nome: nome, config: config }, true);
   return { status: "sucesso" };
 }
 
@@ -327,6 +331,32 @@ function obterConfigAtivo() {
 }
 
 // ======================= SORTEIO E REGISTRO =======================
+
+function premioPublico(premio, completo) {
+  var publico = { id: premio.id, nome: premio.nome, cor: premio.cor, positivo: premio.positivo === true };
+  if (completo) { publico.descricao = premio.descricao || ""; publico.categoria = premio.categoria || ""; }
+  return publico;
+}
+
+function chaveCacheGiro(nome) { return "config_giro_" + chaveEventoPerfil(nome || "_ativo_"); }
+
+function atualizarCacheGiro(perfil, ativo) {
+  if (!perfil || !perfil.config) return;
+  var compacto = { nome: perfil.nome, config: { premios: perfil.config.premios, roleta: perfil.config.roleta } };
+  var texto = JSON.stringify(compacto);
+  if (texto.length > 80000) return;
+  var cache = CacheService.getScriptCache();
+  cache.put(chaveCacheGiro(perfil.nome), texto, 120);
+  if (ativo) cache.put(chaveCacheGiro(""), texto, 120);
+}
+
+function obterPerfilParaGiro(nome) {
+  var texto = CacheService.getScriptCache().get(chaveCacheGiro(nome));
+  if (texto) { try { return JSON.parse(texto); } catch (ignorado) {} }
+  var perfil = nome ? obterPerfilPublico(nome) : obterConfigAtivo();
+  atualizarCacheGiro(perfil, !nome);
+  return perfil;
+}
 
 function sortearERegistrarGiro(corpo) {
   var idGiro = validarIdGiro(corpo.idGiro);
@@ -345,6 +375,8 @@ function sortearERegistrarGiro(corpo) {
         repetido.dados.idEvento = eventoRepetido.idEvento;
         repetido.dados.criadoEm = eventoRepetido.criadoEm;
         repetido.dados.iniciarEm = eventoRepetido.iniciarEm;
+        repetido.dados.duracaoGiroMs = eventoRepetido.duracaoGiroMs;
+        repetido.dados.voltasMinimas = eventoRepetido.voltasMinimas;
         repetido.dados.relayEnvelope = assinarEnvelopeRelay(eventoRepetido);
       }
       repetido.dados.emailEnvelope = assinarEnvelopeEmail(repetido.dados);
@@ -353,15 +385,17 @@ function sortearERegistrarGiro(corpo) {
 
     aplicarLimiteDeGiros(clienteId);
     var nomePerfil = normalizarTexto(corpo.perfil || "", "perfil", 80, false);
-    var ativo = nomePerfil ? obterPerfilPublico(nomePerfil) : obterConfigAtivo();
+    var ativo = obterPerfilParaGiro(nomePerfil);
     if (!ativo || !ativo.config || ativo.config.premios.length < 2) throw new Error("Nenhum perfil válido está disponível.");
 
     var premios = ativo.config.premios;
-    var premio = premios[indiceAleatorioSeguro(premios.length)];
+    var premio = premioPublico(premios[indiceAleatorioSeguro(premios.length)], true);
+    premios = premios.map(function (item) { return premioPublico(item, false); });
     var agora = new Date();
     var fuso = Session.getScriptTimeZone() || "America/Sao_Paulo";
     var data = Utilities.formatDate(agora, fuso, "dd/MM/yyyy");
-    resultado = { idGiro: idGiro, nome: nome, premio: premio, premios: premios, perfil: ativo.nome, data: data };
+    resultado = { idGiro: idGiro, nome: nome, premio: premio, premios: premios, perfil: ativo.nome, data: data,
+      duracaoGiroMs: ativo.config.roleta.duracaoGiroMs, voltasMinimas: ativo.config.roleta.voltasMinimas };
     registrarGiroRecente(resultado, agora);
   } finally {
     lock.releaseLock();
@@ -387,7 +421,8 @@ function chaveGiroRecente(idGiro) {
 }
 
 function buscarGiroRecente(idGiro) {
-  var texto = PropertiesService.getScriptProperties().getProperty(chaveGiroRecente(idGiro));
+  var chave = chaveGiroRecente(idGiro);
+  var texto = CacheService.getScriptCache().get(chave) || PropertiesService.getScriptProperties().getProperty(chave);
   if (!texto) return null;
   try {
     var giro = JSON.parse(texto);
@@ -404,24 +439,33 @@ function buscarGiroRecente(idGiro) {
 function registrarGiroRecente(resultado, agora) {
   var props = PropertiesService.getScriptProperties();
   var chave = chaveGiroRecente(resultado.idGiro);
-  props.setProperty(chave, JSON.stringify({
+  var completo = {
     idGiro: resultado.idGiro,
     premio: resultado.premio,
     premios: resultado.premios,
     perfil: resultado.perfil,
     data: resultado.data,
-    registradoEm: agora.toISOString()
-  }));
+    registradoEm: agora.toISOString(),
+    duracaoGiroMs: resultado.duracaoGiroMs,
+    voltasMinimas: resultado.voltasMinimas
+  };
+  CacheService.getScriptCache().put(chave, JSON.stringify(completo), SEGUNDOS_EVENTO_TELA);
+  // A propriedade persistente precisa caber mesmo com 50 prêmios no perfil.
+  delete completo.premios;
+  props.setProperty(chave, JSON.stringify(completo));
   var indice;
   try { indice = JSON.parse(props.getProperty(CHAVE_INDICE_GIROS_RECENTES) || "[]"); }
   catch (ignorado) { indice = []; }
   if (!Array.isArray(indice)) indice = [];
+  var expirados = [];
   indice = indice.filter(function (item) {
-    return item && item.chave !== chave && isFinite(Number(item.criadoEm))
-      && Date.now() - Number(item.criadoEm) <= SEGUNDOS_GIRO_RECENTE * 1000;
+    if (!item || item.chave === chave) return false;
+    var recente = isFinite(Number(item.criadoEm)) && Date.now() - Number(item.criadoEm) <= SEGUNDOS_GIRO_RECENTE * 1000;
+    if (!recente) expirados.push(item);
+    return recente;
   });
   indice.unshift({ chave: chave, criadoEm: agora.getTime() });
-  var removidos = indice.splice(MAXIMO_GIROS_RECENTES);
+  var removidos = indice.splice(MAXIMO_GIROS_RECENTES).concat(expirados);
   for (var i = 0; i < removidos.length; i++) {
     props.deleteProperty(removidos[i].chave);
     props.deleteProperty(removidos[i].chave.replace("giro_recente_", "email_giro_"));
@@ -437,7 +481,10 @@ function assinarEnvelopeRelay(evento) {
     perfil: evento.perfil,
     premio: evento.premio,
     premios: evento.premios,
-    criadoEm: evento.criadoEm
+    criadoEm: evento.criadoEm,
+    iniciarEm: evento.iniciarEm,
+    duracaoGiroMs: evento.duracaoGiroMs,
+    voltasMinimas: evento.voltasMinimas
   });
 }
 
@@ -501,7 +548,7 @@ function tentarPublicarEventoGiro(resultado) {
   try {
     var agoraMs = Date.now();
     var anterior = obterUltimoGiro(resultado.perfil);
-    var reutilizarAnterior = anterior && anterior.idGiro === resultado.idGiro && isFinite(Number(anterior.iniciarEm)) && Number(anterior.iniciarEm) > agoraMs + 500;
+    var reutilizarAnterior = anterior && anterior.idGiro === resultado.idGiro && isFinite(Number(anterior.iniciarEm));
     var criadoEm = reutilizarAnterior ? anterior.criadoEm : new Date(agoraMs).toISOString();
     var iniciarEm = reutilizarAnterior ? Number(anterior.iniciarEm) : agoraMs + ATRASO_INICIO_GIRO_MS;
     var evento = {
@@ -511,7 +558,9 @@ function tentarPublicarEventoGiro(resultado) {
       premio: resultado.premio,
       premios: resultado.premios,
       criadoEm: criadoEm,
-      iniciarEm: iniciarEm
+      iniciarEm: iniciarEm,
+      duracaoGiroMs: resultado.duracaoGiroMs || 4800,
+      voltasMinimas: resultado.voltasMinimas || 6
     };
     var cache = CacheService.getScriptCache();
     var eventoCompleto = JSON.stringify(evento);
@@ -525,7 +574,9 @@ function tentarPublicarEventoGiro(resultado) {
       perfil: resultado.perfil,
       premio: resultado.premio,
       criadoEm: criadoEm,
-      iniciarEm: iniciarEm
+      iniciarEm: iniciarEm,
+      duracaoGiroMs: evento.duracaoGiroMs,
+      voltasMinimas: evento.voltasMinimas
     });
     var propriedades = PropertiesService.getScriptProperties();
     propriedades.setProperty(chaveEventoPersistentePerfil(resultado.perfil), eventoMinimo);
@@ -618,13 +669,15 @@ function buscarGiroNoControle(idGiro) {
 function respostaGiroExistente(existente, nomeParticipante) {
   var dataRegistro = existente.registradoEm instanceof Date ? existente.registradoEm : new Date(existente.registradoEm);
   var fuso = Session.getScriptTimeZone() || "America/Sao_Paulo";
-  var ativo = obterConfigAtivo();
+  var ativo = existente.premios ? null : obterConfigAtivo();
   return {
     status: "sucesso", duplicado: true,
     dados: {
       idGiro: existente.idGiro, nome: nomeParticipante, premio: existente.premio,
-      premios: ativo && ativo.nome === existente.perfil ? ativo.config.premios : [existente.premio],
+      premios: existente.premios || (ativo && ativo.nome === existente.perfil ? ativo.config.premios : [existente.premio]),
       perfil: existente.perfil,
+      duracaoGiroMs: existente.duracaoGiroMs || 4800,
+      voltasMinimas: existente.voltasMinimas || 6,
       data: Utilities.formatDate(dataRegistro, fuso, "dd/MM/yyyy")
     }
   };

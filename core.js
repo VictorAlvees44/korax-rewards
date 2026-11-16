@@ -241,7 +241,7 @@ export async function enviarEmailGiroRemoto(emailEnvelope) {
  * O ponto médio da requisição compensa diferenças de relógio e boa parte da
  * latência, mantendo notebook e TVs alinhados sem exigir WebSocket.
  */
-export function calcularAtrasoSincronizado(evento, agora = Date.now()) {
+export function obterInicioLocalSincronizado(evento) {
   const iniciarEm = Number(evento && evento.iniciarEm);
   if (!Number.isFinite(iniciarEm) || iniciarEm <= 0) return 0;
   const servidorRecebeuEm = Number(evento.servidorRecebeuEm);
@@ -257,8 +257,11 @@ export function calcularAtrasoSincronizado(evento, agora = Date.now()) {
   // O backend já publica um instante futuro comum. O aviso em tempo real do
   // Corporate Screen antecipa a consulta das TVs; somar outra margem aqui
   // apenas atrasaria notebook e telas depois de todos já terem o evento.
-  const atraso = iniciarEm - diferencaRelogio - Number(agora);
-  return Math.max(0, Math.min(10000, Math.round(atraso)));
+  return iniciarEm - diferencaRelogio;
+}
+
+export function calcularAtrasoSincronizado(evento, agora = Date.now()) {
+  return Math.max(0, Math.min(10000, Math.round(obterInicioLocalSincronizado(evento) - Number(agora))));
 }
 
 export function gerarIdSeguro() {
@@ -651,7 +654,7 @@ export function sortearPremioAleatorio(premios) {
   return premios[sortearIndiceUniforme(premios.length)];
 }
 
-export function calcularAnguloFinal(premios, premioEscolhido) {
+export function calcularAnguloFinal(premios, premioEscolhido, sincronizado = false) {
   const n = premios.length;
   const anguloFatia = (Math.PI * 2) / n;
   const indice = premios.findIndex((p) => p.id === premioEscolhido.id);
@@ -661,7 +664,7 @@ export function calcularAnguloFinal(premios, premioEscolhido) {
   // Pequena variação aleatória dentro da fatia para parecer natural,
   // mas nunca perto das bordas (evita "quase acertou o vizinho").
   const margem = anguloFatia * 0.18;
-  const variacao = (Math.random() * 2 - 1) * (anguloFatia / 2 - margem);
+  const variacao = sincronizado ? 0 : (Math.random() * 2 - 1) * (anguloFatia / 2 - margem);
   return anguloDaFatia + variacao;
 }
 
@@ -670,17 +673,17 @@ function normalizarAngulo(angulo) {
   return ((angulo % voltaCompleta) + voltaCompleta) % voltaCompleta;
 }
 
-export function girarRoleta(premioEscolhido, duracaoMs, aoTerminar) {
+export function girarRoleta(premioEscolhido, duracaoMs, aoTerminar, inicioLocal = 0) {
   const voltas = (Estado.config.roleta && Estado.config.roleta.voltasMinimas) || 6;
 
-  const anguloAlvoAbsoluto = calcularAnguloFinal(Estado.config.premios, premioEscolhido);
+  const anguloAlvoAbsoluto = calcularAnguloFinal(Estado.config.premios, premioEscolhido, inicioLocal > 0);
   const rotacaoNecessaria = normalizarAngulo(-Math.PI / 2 - anguloAlvoAbsoluto);
   const anguloAtualNormalizado = normalizarAngulo(Estado.anguloAtual);
   const deltaAteAlvo = normalizarAngulo(rotacaoNecessaria - anguloAtualNormalizado);
   const anguloFinal = Estado.anguloAtual + voltas * Math.PI * 2 + deltaAteAlvo;
 
   const anguloInicioAnimacao = Estado.anguloAtual;
-  const reduzirMovimento = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduzirMovimento = !inicioLocal && typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const duracaoEfetiva = reduzirMovimento ? Math.min(600, duracaoMs) : duracaoMs;
   const canvas = Roleta.canvas;
   let terminou = false;
@@ -698,7 +701,7 @@ export function girarRoleta(premioEscolhido, duracaoMs, aoTerminar) {
     aoTerminar();
   }
 
-  if (canvas && typeof canvas.animate === "function") {
+  if (!inicioLocal && canvas && typeof canvas.animate === "function") {
     canvas.classList.add("esta-girando");
     Roleta.animacao = canvas.animate(
       [
@@ -717,7 +720,7 @@ export function girarRoleta(premioEscolhido, duracaoMs, aoTerminar) {
 
   // Compatibilidade com navegadores antigos: ainda movimenta só a camada
   // do canvas, sem redesenhar fatias e textos a cada quadro.
-  const inicio = performance.now();
+  const inicio = performance.now() - (inicioLocal > 0 ? Math.max(0, Date.now() - inicioLocal) : 0);
   function passo(agora) {
     const t = Math.min(1, (agora - inicio) / duracaoEfetiva);
     const progresso = 1 - Math.pow(1 - t, 5);

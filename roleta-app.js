@@ -12,8 +12,8 @@ import {
   validarConfiguracao, adicionarHistorico, mostrarToast,
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela,
   normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela,
-  calcularAtrasoSincronizado
-} from "./core.js?v=20261113-sync2";
+  calcularAtrasoSincronizado, obterInicioLocalSincronizado
+} from "./core.js?v=20261116-sync3";
 
 const parametros = new URLSearchParams(location.search);
 const FORCAR_MODO_LEGADO = parametros.get("legacy") === "1" || window.KORAX_MODO_LEGADO_ATIVO === true;
@@ -33,6 +33,8 @@ let trocandoPerfil = false;
 let timerSincronizacao = 0;
 let ultimoEventoId = "";
 let consultarSincronizacaoTelaAgora = null;
+let telaPronta = false;
+let avisoPendente = null;
 
 function identificadorEvento(evento) {
   return String(evento?.idEvento || evento?.idGiro || "");
@@ -42,12 +44,15 @@ async function avisarCorporateScreen(evento) {
   const idEvento = identificadorEvento(evento);
   if (!/^[A-Za-z0-9_-]{16,160}$/.test(idEvento) || typeof fetch !== "function") return null;
   const clienteEnviadoEm = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1200);
   try {
     const resposta = await fetch(URL_AVISO_CORPORATE_SCREEN, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=UTF-8" },
       body: typeof evento.relayEnvelope === "string" ? evento.relayEnvelope : idEvento,
       mode: "cors",
+      signal: controller.signal,
       keepalive: true
     });
     if (!resposta.ok) return null;
@@ -65,26 +70,21 @@ async function avisarCorporateScreen(evento) {
     };
   } catch (ignorado) {
     return null;
-  }
+  } finally { clearTimeout(timeout); }
 }
 
 function receberAvisoCorporateScreen(evento) {
   if (!MODO_TELA || evento.origin !== ORIGEM_CORPORATE_SCREEN || evento.source !== window.parent) return;
   const dados = evento.data;
   if (!dados || dados.type !== TIPO_AVISO_CORPORATE_SCREEN || !/^[A-Za-z0-9_-]{16,160}$/.test(String(dados.eventId || ""))) return;
+  if (!telaPronta) { avisoPendente = evento; return; }
   if (dados.event && typeof dados.event === "object") {
     const id = identificadorEvento(dados.event);
     const criadoEm = Date.parse(dados.event.criadoEm || "");
     if (id && id !== ultimoEventoId && Number.isFinite(criadoEm) && Math.abs(Date.now() - criadoEm) <= JANELA_EVENTO_TELA_MS) {
-      marcarEventoVisto(dados.event.perfil || Estado.nomePerfilAtivo, id);
-      prepararRoletaParaResultado(dados.event);
-      void aguardarInicioSincronizado(dados.event).then(() => {
-        if (Estado.girando) return;
-        Estado.girando = true;
-        tocarSom("audioGiro");
-        const duracaoMs = Estado.config.roleta?.duracaoGiroMs || 4800;
-        girarRoleta(dados.event.premio, duracaoMs, () => finalizarGiroLocal(dados.event));
-      });
+      if (Estado.girando) return;
+      marcarEventoVisto(PERFIL_DA_URL ? Estado.nomePerfilAtivo : "todos-os-perfis", id);
+      void executarGiroNaTela(dados.event);
       return;
     }
   }
@@ -305,7 +305,7 @@ async function iniciarFluxoDeGiro(nomeParticipante) {
     await aguardarInicioSincronizado(eventoSincronizado);
     tocarSom("audioGiro");
     const duracaoMs = Estado.config.roleta?.duracaoGiroMs || 4800;
-    girarRoleta(eventoSincronizado.premio, duracaoMs, () => finalizarGiroLocal(registro));
+    girarRoleta(eventoSincronizado.premio, duracaoMs, () => finalizarGiroLocal(registro), obterInicioLocalSincronizado(eventoSincronizado));
   } catch (erro) {
     Estado.girando = false;
     document.getElementById("btnGirar").disabled = false;
@@ -321,6 +321,10 @@ function prepararRoletaParaResultado(registro) {
     Estado.config.premios = [premio, ...Estado.config.premios];
   }
   Estado.nomePerfilAtivo = registro.perfil || Estado.nomePerfilAtivo;
+  Estado.config.roleta = Estado.config.roleta || {};
+  if (Number.isFinite(registro.duracaoGiroMs)) Estado.config.roleta.duracaoGiroMs = registro.duracaoGiroMs;
+  if (Number.isFinite(registro.voltasMinimas)) Estado.config.roleta.voltasMinimas = registro.voltasMinimas;
+  Estado.anguloAtual = 0;
   Roleta.desenhar(Estado.anguloAtual);
 }
 
@@ -347,12 +351,12 @@ function finalizarGiroLocal(registro) {
 
 async function executarGiroNaTela(evento) {
   if (Estado.girando || !evento?.premio || !evento?.perfil) return;
-  if (evento.perfil !== Estado.nomePerfilAtivo) {
+  if (evento.perfil !== Estado.nomePerfilAtivo && !Array.isArray(evento.premios)) {
     const carregou = await selecionarPerfil(evento.perfil, { silencioso: true });
     if (!carregou) return;
   }
   Estado.girando = true;
-  prepararRoletaParaResultado({ premio: evento.premio, premios: evento.premios, perfil: evento.perfil });
+  prepararRoletaParaResultado(evento);
   const atraso = calcularAtrasoSincronizado(evento);
   if (atraso > 0) atualizarStatusTela(`Giro sincronizado • ${Estado.nomePerfilAtivo}`, true);
   await aguardarInicioSincronizado(evento);
@@ -362,7 +366,7 @@ async function executarGiroNaTela(evento) {
     efeitosDoResultado(evento.premio);
     ModalResultado.abrir(evento.premio);
     Estado.girando = false;
-  });
+  }, obterInicioLocalSincronizado(evento));
 }
 
 function atualizarStatusTela(texto, conectado) {
@@ -387,7 +391,7 @@ function iniciarSincronizacaoTela() {
       const idEvento = identificadorEvento(evento);
       if (idEvento && idEvento !== ultimoEventoId) {
         const criadoEm = Date.parse(evento.criadoEm || "");
-        const idade = Date.now() - criadoEm;
+        const idade = (evento.servidorAgora || Date.now()) - criadoEm;
         const eventoRecente = Number.isFinite(criadoEm) && idade >= -30000 && idade <= JANELA_EVENTO_TELA_MS;
         marcarEventoVisto(canal, idEvento);
         if (eventoRecente) await executarGiroNaTela(evento);
@@ -451,6 +455,12 @@ async function iniciarAplicacao() {
       return;
     }
     iniciarSincronizacaoTela();
+    telaPronta = true;
+    if (avisoPendente) {
+      const aviso = avisoPendente;
+      avisoPendente = null;
+      receberAvisoCorporateScreen(aviso);
+    }
     return;
   }
 
