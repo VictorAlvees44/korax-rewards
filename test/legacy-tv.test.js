@@ -78,6 +78,7 @@ test("a TV preserva a descrição do resultado mesmo quando a lista de fatias é
   const trecho = legacy.slice(legacy.indexOf("  function runEvent(event) {"), legacy.indexOf("  function rememberEvent(id) {"));
   let resultado;
   const contexto = {
+    managedRelay: false,
     state: { profile: "Comercial", config: { premios: [], roleta: {} }, angle: 0, spinning: false, spinGeneration: 0 },
     drawWheel() {}, synchronizedDelay: () => 0, synchronizedStartAt: () => Date.now(),
     window: { setTimeout: (callback) => callback(), clearTimeout() {} }, stopAudio() {}, playAudio() {}, byId: () => null,
@@ -87,7 +88,7 @@ test("a TV preserva a descrição do resultado mesmo quando a lista de fatias é
   assert.equal(resultado.descricao, "Retirar no comercial");
 });
 
-test("o receptor automático fica pronto com os dados locais, sem consultar o Google nem girar sozinho", () => {
+test("o receptor automático fica pronto antes de buscar o visual, sem girar sozinho", () => {
   const notificacoes = [];
   let configurou = false;
   let ouviu = false;
@@ -99,6 +100,7 @@ test("o receptor automático fica pronto com os dados locais, sem consultar o Go
     window: { CONFIG_PADRAO: { premios: [{ id: "a" }, { id: "b" }] },
       addEventListener: () => { ouviu = true; }, parent: { postMessage: (...args) => notificacoes.push(args) } },
     prepareLayout() {}, prepareAudio() {}, receiveCorporateScreenWake() {}, setStatus() {},
+    request: (action) => { assert.equal(action, "configAtivo"); assert.equal(notificacoes.length, 1); },
     prepareFullscreen: () => { throw new Error("Tela cheia não deve ser solicitada em segundo plano"); },
     loadInitialConfig: () => { throw new Error("Não deve consultar o backend no modo relay"); },
     applyConfig: (_, config) => { estado.config = config; configurou = true; }

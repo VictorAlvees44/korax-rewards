@@ -28,6 +28,7 @@
   var POLL_INTERVAL_MS = 900;
   var state = {
     config: null,
+    brandConfig: null,
     pendingWake: null,
     profile: "",
     angle: 0,
@@ -519,7 +520,10 @@
       if (Number(event.voltasMinimas) >= 2) state.config.roleta.voltasMinimas = Number(event.voltasMinimas);
       state.angle = 0;
       var selected = event.premio;
-      drawWheel(state.angle);
+      if (managedRelay && state.brandConfig) {
+        state.config.empresa = state.brandConfig;
+        applyConfig(event.perfil, state.config);
+      } else drawWheel(state.angle);
       state.spinning = true;
       var delay = synchronizedDelay(event);
       var startAtLocal = synchronizedStartAt(event) || new Date().getTime();
@@ -644,6 +648,13 @@
       applyConfig("Roleta Comercial", window.CONFIG_PADRAO || {});
       setStatus("Pronta para o giro", true);
       notifyReady();
+      // O visual é preparado uma única vez em segundo plano. READY e os
+      // eventos oficiais não aguardam esta resposta do Google.
+      request("configAtivo", {}, function (error, payload) {
+        if (error || !payload.dados || !payload.dados.config) return;
+        state.brandConfig = payload.dados.config.empresa || {};
+        if (!state.spinning && !state.lastEventId) applyConfig(payload.dados.nome, payload.dados.config);
+      });
       return;
     }
     loadInitialConfig();
