@@ -83,6 +83,39 @@ test("o resultado diferencia visualmente premios positivos e negativos nas TVs",
   assert.match(estilosLegados, /\.resultado-legado--negativo \.resultado-legado__selo/);
 });
 
+test("a TV mantém o resultado visível antes de liberar o Corporate Screen", () => {
+  const trecho = legacy.slice(legacy.indexOf("  function runEvent(event) {"), legacy.indexOf("  function rememberEvent(id) {"));
+  const notificacoes = [];
+  let concluirResultado;
+  const estado = {
+    profile: "Comercial",
+    config: { premios: [], roleta: {} },
+    angle: 0,
+    spinning: false,
+    spinGeneration: 0,
+    startTimer: 0,
+    resultTimer: 0
+  };
+  const contexto = {
+    managedRelay: true,
+    state: estado,
+    drawWheel() {},
+    synchronizedDelay: () => 0,
+    window: { setTimeout: (callback) => { callback(); return 1; }, clearTimeout() {} },
+    stopAudio() {},
+    playAudio() {},
+    byId: () => null,
+    animateSpin: (_premio, done, onStart) => { onStart(); done(); },
+    showResult: (_premio, onFinished) => { concluirResultado = onFinished; },
+    notifyPlayback: (fase) => notificacoes.push(fase)
+  };
+  vm.runInNewContext(trecho + ';runEvent({perfil:"Comercial",premio:{id:"a",nome:"Chocolate"},premios:[{id:"a",nome:"Chocolate"},{id:"b",nome:"Café"}]});', contexto);
+  assert.deepEqual(notificacoes, ["STARTED"]);
+  assert.equal(typeof concluirResultado, "function");
+  concluirResultado();
+  assert.deepEqual(notificacoes, ["STARTED", "FINISHED"]);
+});
+
 test("o giro avisa o Corporate Screen e mantém o polling como contingência", () => {
   assert.match(index, /connect-src[^>]+https:\/\/telas\.telacorporativa\.com\.br/);
   assert.match(moderno, /https:\/\/telas\.telacorporativa\.com\.br\/api\/roulette\/wake/);

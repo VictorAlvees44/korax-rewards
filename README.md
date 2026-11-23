@@ -112,7 +112,7 @@ No notebook, abra a página pública:
 
 `https://victoralvees44.github.io/korax-rewards/`
 
-Durante a programação normal, a Corporate Screen prepara um receptor oculto nas TVs aprovadas e configuradas como destino. Ao girar no notebook, elas passam automaticamente à roleta, mostram o resultado por 12 segundos e retornam à programação, sem trocar a playlist cadastrada. O receptor automático usa `relay=1`, sinaliza prontidão e recebe os dados oficiais pelo player; não faz consultas repetidas ao Google em segundo plano.
+Durante a programação normal, a Corporate Screen prepara um receptor oculto nas TVs aprovadas e configuradas como destino. Ao girar no notebook, elas passam automaticamente à roleta, mostram o resultado por 12 segundos e retornam à programação, sem trocar a playlist cadastrada. A confirmação `FINISHED` só é enviada depois desses 12 segundos, evitando que o player oculte a tela final antes de o prêmio aparecer. O receptor automático usa `relay=1`, sinaliza prontidão e recebe os dados oficiais pelo player; não faz consultas repetidas ao Google em segundo plano.
 
 O mesmo endereço também pode ser cadastrado manualmente como página web em uma playlist. Nesse caso, a página reconhece o contexto de TV e aguarda os giros de qualquer perfil, mantendo esse modo de uso disponível. O perfil e o resultado sorteados no notebook são reproduzidos sem registrar novamente o participante.
 

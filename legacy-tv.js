@@ -31,6 +31,7 @@
 
   var EVENT_WINDOW_MS = 2 * 60 * 1000;
   var POLL_INTERVAL_MS = 900;
+  var RESULT_DISPLAY_MS = 12000;
   var state = {
     config: null,
     brandConfig: null,
@@ -477,7 +478,7 @@
     raf(frame);
   }
 
-  function showResult(prize) {
+  function showResult(prize, onFinished) {
     var overlay = byId("resultadoLegado");
     if (!overlay) {
       overlay = document.createElement("div");
@@ -495,7 +496,11 @@
     byId("resultadoLegadoDescricao").innerHTML = escapeHtml(prize.descricao || (positive ? "Aproveite o seu premio!" : "Uma nova chance vem por ai."));
     overlay.style.display = "block";
     window.clearTimeout(state.resultTimer);
-    state.resultTimer = window.setTimeout(function () { overlay.style.display = "none"; }, 12000);
+    state.resultTimer = window.setTimeout(function () {
+      overlay.style.display = "none";
+      state.resultTimer = 0;
+      if (onFinished) onFinished();
+    }, RESULT_DISPLAY_MS);
   }
 
   function synchronizedStartAt(event) {
@@ -522,6 +527,8 @@
     if (!event || !event.premio || !event.perfil || (state.spinning && !managedRelay)) return;
     state.spinGeneration += 1;
     window.clearTimeout(state.startTimer);
+    window.clearTimeout(state.resultTimer);
+    state.resultTimer = 0;
     var previousResult = byId("resultadoLegado");
     if (previousResult) previousResult.style.display = "none";
     function start() {
@@ -545,9 +552,10 @@
         animateSpin(selected, function () {
           stopAudio("audioGiro");
           playAudio(selected.positivo === false ? "audioDerrota" : "audioVitoria");
-          showResult(selected);
           state.spinning = false;
-          notifyPlayback("FINISHED", event);
+          // O Corporate Screen oculta o receptor ao receber FINISHED. Avisa
+          // somente depois de exibir o resultado completo na TV.
+          showResult(selected, function () { notifyPlayback("FINISHED", event); });
         }, function () { notifyPlayback("STARTED", event); });
       }, delay);
     }
@@ -601,7 +609,11 @@
     if (managedRelay && data && data.type === "CORPORATE_SCREEN_ROULETTE_HIDE") {
       state.spinGeneration += 1;
       window.clearTimeout(state.startTimer);
+      window.clearTimeout(state.resultTimer);
+      state.resultTimer = 0;
       state.spinning = false;
+      var visibleResult = byId("resultadoLegado");
+      if (visibleResult) visibleResult.style.display = "none";
       stopAudio("audioGiro"); stopAudio("audioVitoria"); stopAudio("audioDerrota");
       return;
     }
