@@ -78,11 +78,33 @@ test("a TV preserva a descrição do resultado mesmo quando a lista de fatias é
   const trecho = legacy.slice(legacy.indexOf("  function runEvent(event) {"), legacy.indexOf("  function rememberEvent(id) {"));
   let resultado;
   const contexto = {
-    state: { profile: "Comercial", config: { premios: [], roleta: {} }, angle: 0, spinning: false },
+    state: { profile: "Comercial", config: { premios: [], roleta: {} }, angle: 0, spinning: false, spinGeneration: 0 },
     drawWheel() {}, synchronizedDelay: () => 0, synchronizedStartAt: () => Date.now(),
-    window: { setTimeout: (callback) => callback() }, stopAudio() {}, playAudio() {},
+    window: { setTimeout: (callback) => callback(), clearTimeout() {} }, stopAudio() {}, playAudio() {}, byId: () => null,
     animateSpin: (premio, done) => { resultado = premio; done(); }, showResult() {}
   };
   vm.runInNewContext(trecho + ';runEvent({perfil:"Comercial",premio:{id:"a",nome:"Chocolate",descricao:"Retirar no comercial"},premios:[{id:"a",nome:"Chocolate"},{id:"b",nome:"Café"}]});', contexto);
   assert.equal(resultado.descricao, "Retirar no comercial");
+});
+
+test("o receptor automático fica pronto com os dados locais, sem consultar o Google nem girar sozinho", () => {
+  const notificacoes = [];
+  let configurou = false;
+  let ouviu = false;
+  const inicio = legacy.slice(legacy.lastIndexOf("  function start() {"), legacy.indexOf('  if (document.readyState === "loading")'));
+  const avisar = legacy.slice(legacy.indexOf("  function notifyReady() {"), legacy.indexOf("  function flushPendingWake() {"));
+  const estado = { config: null };
+  vm.runInNewContext(avisar + inicio + ';start();', {
+    managedRelay: true, state: estado,
+    window: { CONFIG_PADRAO: { premios: [{ id: "a" }, { id: "b" }] },
+      addEventListener: () => { ouviu = true; }, parent: { postMessage: (...args) => notificacoes.push(args) } },
+    prepareLayout() {}, prepareAudio() {}, receiveCorporateScreenWake() {}, setStatus() {},
+    prepareFullscreen: () => { throw new Error("Tela cheia não deve ser solicitada em segundo plano"); },
+    loadInitialConfig: () => { throw new Error("Não deve consultar o backend no modo relay"); },
+    applyConfig: (_, config) => { estado.config = config; configurou = true; }
+  });
+  assert.equal(configurou, true);
+  assert.equal(ouviu, true);
+  assert.equal(notificacoes[0][0].type, "CORPORATE_SCREEN_ROULETTE_READY");
+  assert.equal(notificacoes[0][1], "https://telas.telacorporativa.com.br");
 });

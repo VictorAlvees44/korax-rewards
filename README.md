@@ -108,17 +108,19 @@ Perfis antigos com cores iguais são corrigidos ao abrir no admin: os prêmios s
 
 ## Corporate Screen / Tela Corporativa
 
-Na playlist da TV, cadastre uma página web com exatamente o mesmo link usado no notebook:
+No notebook, abra a página pública:
 
 `https://victoralvees44.github.io/korax-rewards/`
 
-Quando a Corporate Screen incorpora esse link na playlist, a página reconhece automaticamente o contexto de TV e aguarda os giros de qualquer perfil. No notebook, o mesmo endereço continua exibindo a escolha de perfil e o botão de giro. O perfil e o resultado sorteados no notebook são reproduzidos na TV sem registrar novamente o participante.
+Durante a programação normal, a Corporate Screen prepara um receptor oculto nas TVs aprovadas e configuradas como destino. Ao girar no notebook, elas passam automaticamente à roleta, mostram o resultado por 12 segundos e retornam à programação, sem trocar a playlist cadastrada. O receptor automático usa `relay=1`, sinaliza prontidão e recebe os dados oficiais pelo player; não faz consultas repetidas ao Google em segundo plano.
+
+O mesmo endereço também pode ser cadastrado manualmente como página web em uma playlist. Nesse caso, a página reconhece o contexto de TV e aguarda os giros de qualquer perfil, mantendo esse modo de uso disponível. O perfil e o resultado sorteados no notebook são reproduzidos sem registrar novamente o participante.
 
 Depois que o backend confirma o giro, o notebook envia ao Corporate Screen um envelope HMAC assinado. O Worker valida a assinatura uma vez e transmite o mesmo resultado às TVs Rodrigo, Renato e Marcelo por WebSocket. Nenhuma TV precisa consultar o Google antes de começar; o polling de 900 ms permanece apenas como contingência.
 
 O Apps Script define um único início 1,2 segundo após publicar o resultado, e esse horário assinado é preservado tanto no WebSocket quanto na contingência. Cada player converte o instante para seu relógio local. Notebook e TVs usam a mesma duração, número de voltas e curva de animação. Se o evento chegar atrasado, a animação avança até o ponto correspondente ao tempo decorrido, sem reiniciar do zero. O tempo entre clicar e ver o giro também inclui a resposta do Google, a rede e a renderização; precisa ser medido nos aparelhos reais.
 
-O sorteio usa cache curto do perfil para evitar reler arquivos do Drive em cada giro. O e-mail é enviado em outra requisição, e o fluxo atual não grava novas linhas na planilha. Após atualizar o sistema, recarregue uma vez a página do notebook e o navegador de cada TV para carregar o novo receptor. Deixe a playlist da roleta pronta nas telas antes de iniciar o giro.
+O sorteio usa cache curto do perfil para evitar reler arquivos do Drive em cada giro. O e-mail é enviado em outra requisição, e o fluxo atual não grava novas linhas na planilha. Após atualizar o sistema, recarregue uma vez a página do notebook e o navegador de cada TV para carregar o novo receptor. No modo automático, as TVs podem continuar com suas playlists habituais.
 
 O mesmo endereço também reconhece automaticamente navegadores antigos de TVs Samsung/LG e carrega um receptor ES5 leve. Não é necessário cadastrar um link diferente nem acrescentar parâmetros na playlist.
 
@@ -128,7 +130,7 @@ O receptor compatível desenha a roleta em SVG para evitar falhas de Canvas em n
 
 O modo TV solicita tela cheia automaticamente e também mostra o botão `TELA CHEIA`, compatível com clique, toque ou a tecla Enter do controle. Por segurança, navegadores podem exigir essa primeira interação e a Corporate Screen precisa permitir tela cheia no conteúdo incorporado. Barras e rodapés criados pelo próprio player não podem ser removidos pela página da roleta.
 
-A tela da playlist deve permanecer carregada antes do giro. O player guarda localmente o último evento exibido e aceita eventos recentes depois de um recarregamento, evitando perder o giro durante a atualização de conteúdo da TV. As URLs antigas com `?modo=tela` continuam compatíveis.
+O navegador do player deve permanecer aberto antes do giro. O player guarda o último evento exibido para não repeti-lo em reconexões; o prazo de retorno segue o horário original do giro. As URLs antigas com `?modo=tela` continuam compatíveis.
 
 ## E-mail e idempotência
 

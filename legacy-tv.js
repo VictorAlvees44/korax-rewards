@@ -13,6 +13,7 @@
   var incorporado = false;
   try { incorporado = window.self !== window.top; } catch (error) { incorporado = true; }
   var referenciadorCorporativo = /(^|\/\/)([^/]*\.)?telacorporativa\.com\.br(?=[:/]|$)/i.test(String(document.referrer || ""));
+  var managedRelay = query.relay === "1" && incorporado && referenciadorCorporativo;
   var navegadorDeTv = /(smart[ -]?tv|tizen|web0s|webos|netcast|hbbtv|viera|inettvbrowser|maple|smart-hub|bravia|aft[a-z0-9]*|crkey|roku|hisense|vewd|opera tv|nettv|dtv|ce-html|android[^)]*\btv\b|; wv\))/i.test(userAgent);
   var scriptDeTeste = document.createElement("script");
   var semSuporteAModulos = !("noModule" in scriptDeTeste);
@@ -31,6 +32,8 @@
     profile: "",
     angle: 0,
     spinning: false,
+    spinGeneration: 0,
+    startTimer: 0,
     lastEventId: "",
     pollTimer: 0,
     resultTimer: 0,
@@ -441,6 +444,7 @@
   }
 
   function animateSpin(prize, done, startAtLocal) {
+    var generation = state.spinGeneration;
     var canvas = byId("roletaLegadaSvg") || byId("canvasRoleta");
     var startAngle = state.angle;
     var finalAngle = calculateFinalAngle(prize);
@@ -448,6 +452,7 @@
     var started = Number(startAtLocal) > 0 ? Math.min(new Date().getTime(), Number(startAtLocal)) : new Date().getTime();
     var raf = window.requestAnimationFrame || window.webkitRequestAnimationFrame || function (callback) { return window.setTimeout(function () { callback(new Date().getTime()); }, 16); };
     function frame(timestamp) {
+      if (generation !== state.spinGeneration) return;
       var now = typeof timestamp === "number" ? timestamp : new Date().getTime();
       var elapsed = now > 100000000000 ? now - started : new Date().getTime() - started;
       var progress = Math.min(1, elapsed / duration);
@@ -502,7 +507,11 @@
   }
 
   function runEvent(event) {
-    if (!event || !event.premio || !event.perfil || state.spinning) return;
+    if (!event || !event.premio || !event.perfil || (state.spinning && !managedRelay)) return;
+    state.spinGeneration += 1;
+    window.clearTimeout(state.startTimer);
+    var previousResult = byId("resultadoLegado");
+    if (previousResult) previousResult.style.display = "none";
     function start() {
       if (event.premios && event.premios.length >= 2) state.config.premios = event.premios;
       state.config.roleta = state.config.roleta || {};
@@ -517,7 +526,7 @@
       // Se o evento já chegou atrasado, usa o horário original para alcançar
       // o mesmo ponto da animação em vez de iniciar um giro novo do zero.
       if (delay > 0) setStatus("Giro sincronizado - " + escapeHtml(state.profile), true);
-      window.setTimeout(function () {
+      state.startTimer = window.setTimeout(function () {
         stopAudio("audioVitoria");
         stopAudio("audioDerrota");
         playAudio("audioGiro");
@@ -575,6 +584,11 @@
   function receiveCorporateScreenWake(event) {
     if (!event || event.origin !== "https://telas.telacorporativa.com.br" || event.source !== window.parent) return;
     var data = event.data;
+    if (managedRelay && data && data.type === "CORPORATE_SCREEN_ROULETTE_PING") { notifyReady(); return; }
+    if (managedRelay && data && data.type === "CORPORATE_SCREEN_ROULETTE_HIDE") {
+      stopAudio("audioGiro"); stopAudio("audioVitoria"); stopAudio("audioDerrota");
+      return;
+    }
     if (!data || data.type !== "CORPORATE_SCREEN_ROULETTE_WAKE" || !/^[A-Za-z0-9_-]{16,160}$/.test(String(data.eventId || ""))) return;
     if (!state.config) { state.pendingWake = event; return; }
     if (data.event && typeof data.event === "object") {
@@ -587,7 +601,12 @@
         return;
       }
     }
-    poll();
+    if (!managedRelay) poll();
+  }
+
+  function notifyReady() {
+    if (!managedRelay || !state.config) return;
+    window.parent.postMessage({ type: "CORPORATE_SCREEN_ROULETTE_READY" }, "https://telas.telacorporativa.com.br");
   }
 
   function flushPendingWake() {
@@ -617,10 +636,16 @@
 
   function start() {
     prepareLayout();
-    prepareFullscreen();
+    if (!managedRelay) prepareFullscreen();
     prepareAudio();
     if (window.addEventListener) window.addEventListener("message", receiveCorporateScreenWake, false);
     else if (window.attachEvent) window.attachEvent("onmessage", receiveCorporateScreenWake);
+    if (managedRelay) {
+      applyConfig("Roleta Comercial", window.CONFIG_PADRAO || {});
+      setStatus("Pronta para o giro", true);
+      notifyReady();
+      return;
+    }
     loadInitialConfig();
   }
 
