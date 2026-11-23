@@ -111,7 +111,7 @@ test("o giro sincronizado tem o mesmo destino em dispositivos com fontes aleató
   }
 });
 
-test("um aviso atrasado avança a animação até o instante atual do giro", (t) => {
+test("um aviso atrasado ainda executa todos os 15 segundos do giro", (t) => {
   const anterior = { config: Estado.config, angulo: Estado.anguloAtual, raf: globalThis.requestAnimationFrame };
   let quadro;
   let finalizou = false;
@@ -128,14 +128,18 @@ test("um aviso atrasado avança a animação até o instante atual do giro", (t)
   t.mock.method(performance, "now", () => 1000);
   t.mock.method(Roleta, "aplicarRotacao", () => {});
   const premio = config.premios[0];
-  girarRoleta(premio, 4000, () => { finalizou = true; }, 49000);
+  girarRoleta(premio, 15000, () => { finalizou = true; }, 47000);
   quadro(1000);
+  assert.equal(Estado.anguloAtual, 0);
   const volta = 2 * Math.PI;
   const destino = ((-Math.PI / 2 - calcularAnguloFinal(config.premios, premio, true)) % volta + volta) % volta;
-  const esperado = ((config.roleta.voltasMinimas || 6) * volta + destino) * (1 - Math.pow(0.75, 5));
+  quadro(4000);
+  const esperado = ((config.roleta.voltasMinimas || 6) * volta + destino) * (1 - Math.pow(0.8, 5));
   assert.ok(Math.abs(Estado.anguloAtual - esperado) < 1e-9);
   assert.equal(finalizou, false);
-  quadro(4000);
+  quadro(15999);
+  assert.equal(finalizou, false);
+  quadro(16000);
   assert.equal(finalizou, true);
   assert.equal(obterInicioLocalSincronizado({ iniciarEm: 49000 }), 49000);
 });

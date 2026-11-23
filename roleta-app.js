@@ -13,7 +13,7 @@ import {
   tocarSom, pararSom, carregarSonsNosElementos, aplicarVisualNaTela,
   normalizarChavePerfil, resolverNomePerfilDisponivel, deveUsarModoTela,
   calcularAtrasoSincronizado, obterInicioLocalSincronizado
-} from "./core.js?v=20261116-sync3";
+} from "./core.js?v=20261123-full1";
 
 const parametros = new URLSearchParams(location.search);
 const FORCAR_MODO_LEGADO = parametros.get("legacy") === "1" || window.KORAX_MODO_LEGADO_ATIVO === true;

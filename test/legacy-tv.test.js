@@ -82,7 +82,7 @@ test("a TV preserva a descrição do resultado mesmo quando a lista de fatias é
     state: { profile: "Comercial", config: { premios: [], roleta: {} }, angle: 0, spinning: false, spinGeneration: 0 },
     drawWheel() {}, synchronizedDelay: () => 0, synchronizedStartAt: () => Date.now(),
     window: { setTimeout: (callback) => callback(), clearTimeout() {} }, stopAudio() {}, playAudio() {}, byId: () => null,
-    animateSpin: (premio, done) => { resultado = premio; done(); }, showResult() {}
+    animateSpin: (premio, done) => { resultado = premio; done(); }, showResult() {}, notifyPlayback() {}
   };
   vm.runInNewContext(trecho + ';runEvent({perfil:"Comercial",premio:{id:"a",nome:"Chocolate",descricao:"Retirar no comercial"},premios:[{id:"a",nome:"Chocolate"},{id:"b",nome:"Café"}]});', contexto);
   assert.equal(resultado.descricao, "Retirar no comercial");
@@ -96,7 +96,7 @@ test("o receptor automático fica pronto antes de buscar o visual, sem girar soz
   const avisar = legacy.slice(legacy.indexOf("  function notifyReady() {"), legacy.indexOf("  function flushPendingWake() {"));
   const estado = { config: null };
   vm.runInNewContext(avisar + inicio + ';start();', {
-    managedRelay: true, state: estado,
+    managedRelay: true, state: estado, PARENT_ORIGIN: "https://telas.telacorporativa.com.br",
     window: { CONFIG_PADRAO: { premios: [{ id: "a" }, { id: "b" }] },
       addEventListener: () => { ouviu = true; }, parent: { postMessage: (...args) => notificacoes.push(args) } },
     prepareLayout() {}, prepareAudio() {}, receiveCorporateScreenWake() {}, setStatus() {},
@@ -109,4 +109,29 @@ test("o receptor automático fica pronto antes de buscar o visual, sem girar soz
   assert.equal(ouviu, true);
   assert.equal(notificacoes[0][0].type, "CORPORATE_SCREEN_ROULETTE_READY");
   assert.equal(notificacoes[0][1], "https://telas.telacorporativa.com.br");
+});
+
+test("a TV antiga conta os 15 segundos a partir do primeiro quadro", () => {
+  const trecho = legacy.slice(legacy.indexOf("  function animateSpin("), legacy.indexOf("  function showResult("));
+  let now = 50000;
+  let quadro;
+  let terminou = false;
+  let iniciou = 0;
+  const estado = { angle: 0, spinGeneration: 1, config: { roleta: { duracaoGiroMs: 15000 } } };
+  class Clock extends Date { constructor() { super(now); } }
+  vm.runInNewContext(trecho + ';animateSpin({}, function () { done(); }, function () { started(); });', {
+    state: estado, Date: Clock, byId: () => ({}), calculateFinalAngle: () => 60,
+    setRotation() {}, normalizeAngle: (angle) => angle % (2 * Math.PI),
+    window: { requestAnimationFrame: (callback) => { quadro = callback; } },
+    done: () => { terminou = true; }, started: () => { iniciou++; }
+  });
+  // Simula um primeiro quadro atrasado; o timestamp do RAF não é epoch nas TVs.
+  now += 3000; quadro(100);
+  assert.equal(estado.angle, 0);
+  assert.equal(iniciou, 1);
+  now += 14999; quadro(15099);
+  assert.equal(terminou, false);
+  now += 1; quadro(15100);
+  assert.equal(terminou, true);
+  assert.equal(iniciou, 1);
 });

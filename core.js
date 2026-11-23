@@ -720,8 +720,11 @@ export function girarRoleta(premioEscolhido, duracaoMs, aoTerminar, inicioLocal 
 
   // Compatibilidade com navegadores antigos: ainda movimenta só a camada
   // do canvas, sem redesenhar fatias e textos a cada quadro.
-  const inicio = performance.now() - (inicioLocal > 0 ? Math.max(0, Date.now() - inicioLocal) : 0);
+  // O início sincronizado agenda o giro, mas atrasos de rede nunca consomem
+  // parte da animação: cada tela executa a duração integral configurada.
+  let inicio = null;
   function passo(agora) {
+    if (inicio === null) inicio = agora;
     const t = Math.min(1, (agora - inicio) / duracaoEfetiva);
     const progresso = 1 - Math.pow(1 - t, 5);
     Estado.anguloAtual = anguloInicioAnimacao + (anguloFinal - anguloInicioAnimacao) * progresso;

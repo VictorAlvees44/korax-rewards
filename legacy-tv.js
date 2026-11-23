@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  var PUBLIC_BASE = "https://victoralvees44.github.io/korax-rewards/";
+  var localReceiver = window.CORPORATE_SCREEN_RECEIVER_LOCAL === true;
+  var PARENT_ORIGIN = localReceiver ? window.location.protocol + "//" + window.location.host : "https://telas.telacorporativa.com.br";
+  var PUBLIC_BASE = localReceiver ? PARENT_ORIGIN + "/roulette-tv/" : "https://victoralvees44.github.io/korax-rewards/";
   var BACKEND_PUBLICO = "https://script.google.com/macros/s/AKfycby7kd3UAutZJKSMWHYBFf8Lj0o2xYxAammezuomd8pZPYhrx0FC9ClI2j37eGiGOgHa3Q/exec";
   var SOUND_URLS = {
     giro: PUBLIC_BASE + "assets/audio/roleta-girando.mp3",
@@ -13,6 +15,9 @@
   var incorporado = false;
   try { incorporado = window.self !== window.top; } catch (error) { incorporado = true; }
   var referenciadorCorporativo = /(^|\/\/)([^/]*\.)?telacorporativa\.com\.br(?=[:/]|$)/i.test(String(document.referrer || ""));
+  if (localReceiver && incorporado) {
+    try { referenciadorCorporativo = window.parent.location.protocol + "//" + window.parent.location.host === PARENT_ORIGIN; } catch (error) { referenciadorCorporativo = false; }
+  }
   var managedRelay = query.relay === "1" && incorporado && referenciadorCorporativo;
   var navegadorDeTv = /(smart[ -]?tv|tizen|web0s|webos|netcast|hbbtv|viera|inettvbrowser|maple|smart-hub|bravia|aft[a-z0-9]*|crkey|roku|hisense|vewd|opera tv|nettv|dtv|ce-html|android[^)]*\btv\b|; wv\))/i.test(userAgent);
   var scriptDeTeste = document.createElement("script");
@@ -444,19 +449,21 @@
     return state.angle + turns * Math.PI * 2 + delta;
   }
 
-  function animateSpin(prize, done, startAtLocal) {
+  function animateSpin(prize, done, onStart) {
     var generation = state.spinGeneration;
     var canvas = byId("roletaLegadaSvg") || byId("canvasRoleta");
     var startAngle = state.angle;
     var finalAngle = calculateFinalAngle(prize);
     var duration = state.config && state.config.roleta && Number(state.config.roleta.duracaoGiroMs) || 4800;
-    var started = Number(startAtLocal) > 0 ? Math.min(new Date().getTime(), Number(startAtLocal)) : new Date().getTime();
+    var started = null;
     var raf = window.requestAnimationFrame || window.webkitRequestAnimationFrame || function (callback) { return window.setTimeout(function () { callback(new Date().getTime()); }, 16); };
-    function frame(timestamp) {
+    function frame() {
       if (generation !== state.spinGeneration) return;
-      var now = typeof timestamp === "number" ? timestamp : new Date().getTime();
-      var elapsed = now > 100000000000 ? now - started : new Date().getTime() - started;
-      var progress = Math.min(1, elapsed / duration);
+      // O relógio começa no primeiro quadro visível, inclusive se o aviso
+      // chegou atrasado. Não pula segundos do giro para alcançar outra TV.
+      var now = new Date().getTime();
+      if (started === null) { started = now; if (onStart) onStart(); }
+      var progress = Math.min(1, Math.max(0, now - started) / duration);
       var eased = 1 - Math.pow(1 - progress, 5);
       state.angle = startAngle + (finalAngle - startAngle) * eased;
       setRotation(canvas, state.angle);
@@ -526,9 +533,6 @@
       } else drawWheel(state.angle);
       state.spinning = true;
       var delay = synchronizedDelay(event);
-      var startAtLocal = synchronizedStartAt(event) || new Date().getTime();
-      // Se o evento já chegou atrasado, usa o horário original para alcançar
-      // o mesmo ponto da animação em vez de iniciar um giro novo do zero.
       if (delay > 0) setStatus("Giro sincronizado - " + escapeHtml(state.profile), true);
       state.startTimer = window.setTimeout(function () {
         stopAudio("audioVitoria");
@@ -539,7 +543,8 @@
           playAudio(selected.positivo === false ? "audioDerrota" : "audioVitoria");
           showResult(selected);
           state.spinning = false;
-        }, startAtLocal);
+          notifyPlayback("FINISHED", event);
+        }, function () { notifyPlayback("STARTED", event); });
       }, delay);
     }
     if (String(event.perfil) === String(state.profile) || (event.premios && event.premios.length >= 2)) { state.profile = String(event.perfil); return start(); }
@@ -586,10 +591,13 @@
   }
 
   function receiveCorporateScreenWake(event) {
-    if (!event || event.origin !== "https://telas.telacorporativa.com.br" || event.source !== window.parent) return;
+    if (!event || event.origin !== PARENT_ORIGIN || event.source !== window.parent) return;
     var data = event.data;
     if (managedRelay && data && data.type === "CORPORATE_SCREEN_ROULETTE_PING") { notifyReady(); return; }
     if (managedRelay && data && data.type === "CORPORATE_SCREEN_ROULETTE_HIDE") {
+      state.spinGeneration += 1;
+      window.clearTimeout(state.startTimer);
+      state.spinning = false;
       stopAudio("audioGiro"); stopAudio("audioVitoria"); stopAudio("audioDerrota");
       return;
     }
@@ -610,7 +618,12 @@
 
   function notifyReady() {
     if (!managedRelay || !state.config) return;
-    window.parent.postMessage({ type: "CORPORATE_SCREEN_ROULETTE_READY" }, "https://telas.telacorporativa.com.br");
+    window.parent.postMessage({ type: "CORPORATE_SCREEN_ROULETTE_READY" }, PARENT_ORIGIN);
+  }
+
+  function notifyPlayback(phase, event) {
+    if (!managedRelay) return;
+    window.parent.postMessage({ type: "CORPORATE_SCREEN_ROULETTE_" + phase, eventId: String(event.idEvento || event.idGiro || "") }, PARENT_ORIGIN);
   }
 
   function flushPendingWake() {
