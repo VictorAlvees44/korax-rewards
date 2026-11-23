@@ -8,13 +8,9 @@
  *   ROULETTE_RELAY_SECRET segredo compartilhado somente com o Worker
  */
 
-// A planilha operacional registra os dados necessários para entregar o prêmio.
-var CABECALHO = ["Nome", "Data", "Prêmio"];
-// Controle técnico separado: não contém o nome do participante e fica oculto.
-var CABECALHO_CONTROLE = ["ID do Giro", "Prêmio (JSON)", "Perfil", "Registrado em"];
+// Serviço independente: resultados por e-mail, sem acesso a planilhas.
 var PASTA_PERFIS_NOME = "RoletaCorp_Perfis";
 var ARQUIVO_ATIVO_NOME = "_perfil_ativo.json";
-var ABA_CONTROLE_NOME = "_Controle_Giros_v2";
 var TAMANHO_MAX_REQUISICAO = 8 * 1024 * 1024;
 var LIMITE_GIROS_JANELA = 20;
 var SEGUNDOS_JANELA_GIROS = 300;
@@ -641,31 +637,6 @@ function indiceAleatorioSeguro(tamanho) {
   return valor % tamanho;
 }
 
-function obterAbaControle() {
-  var arquivo = SpreadsheetApp.getActiveSpreadsheet();
-  var aba = arquivo.getSheetByName(ABA_CONTROLE_NOME);
-  if (!aba) {
-    aba = arquivo.insertSheet(ABA_CONTROLE_NOME);
-    aba.appendRow(CABECALHO_CONTROLE);
-    aba.setFrozenRows(1);
-    aba.getRange(1, 1, 1, CABECALHO_CONTROLE.length).setFontWeight("bold");
-    aba.hideSheet();
-  }
-  return aba;
-}
-
-function buscarGiroNoControle(idGiro) {
-  var aba = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ABA_CONTROLE_NOME);
-  if (!aba || aba.getLastRow() < 2) return null;
-  var celula = aba.getRange(2, 1, aba.getLastRow() - 1, 1).createTextFinder(idGiro).matchEntireCell(true).findNext();
-  if (!celula) return null;
-  var valores = aba.getRange(celula.getRow(), 1, 1, CABECALHO_CONTROLE.length).getValues()[0];
-  return {
-    idGiro: valores[0], premio: JSON.parse(valores[1]),
-    perfil: removerPrefixoPlanilha(valores[2]), registradoEm: valores[3]
-  };
-}
-
 function respostaGiroExistente(existente, nomeParticipante) {
   var dataRegistro = existente.registradoEm instanceof Date ? existente.registradoEm : new Date(existente.registradoEm);
   var fuso = Session.getScriptTimeZone() || "America/Sao_Paulo";
@@ -681,37 +652,6 @@ function respostaGiroExistente(existente, nomeParticipante) {
       data: Utilities.formatDate(dataRegistro, fuso, "dd/MM/yyyy")
     }
   };
-}
-
-function obterAbaRegistrosDoMes(agora) {
-  var arquivo = SpreadsheetApp.getActiveSpreadsheet();
-  var fuso = Session.getScriptTimeZone() || "America/Sao_Paulo";
-  var mesAno = Utilities.formatDate(agora, fuso, "MM-yyyy");
-  var nomeAba = "Registros - " + mesAno;
-  var aba = arquivo.getSheetByName(nomeAba);
-  if (!aba) {
-    aba = arquivo.insertSheet(nomeAba);
-    aba.appendRow(CABECALHO);
-    aba.setFrozenRows(1);
-    aba.getRange(1, 1, 1, CABECALHO.length).setFontWeight("bold");
-  }
-  return aba;
-}
-
-function garantirCabecalhoAtual(aba) {
-  if (aba.getLastRow() === 0) {
-    aba.appendRow(CABECALHO);
-  } else {
-    var atual = aba.getRange(1, 1, 1, CABECALHO.length).getValues()[0];
-    if (atual[0] !== CABECALHO[0] || atual[1] !== CABECALHO[1]) {
-      throw new Error("A aba de registros possui um cabeçalho incompatível.");
-    }
-    if (!atual[2]) {
-      aba.getRange(1, 3).setValue(CABECALHO[2]).setFontWeight("bold");
-    } else if (atual[2] !== CABECALHO[2]) {
-      throw new Error("A coluna de prêmio da aba de registros possui um cabeçalho incompatível.");
-    }
-  }
 }
 
 function enviarEmailNotificacao(dados) {
@@ -814,16 +754,6 @@ function normalizarTexto(valor, campo, maximo, obrigatorio) {
   if (texto.length > maximo) throw new Error("Campo excede o limite: " + campo + ".");
   if (/[\u0000-\u001F\u007F]/.test(texto)) throw new Error("Campo contém caracteres inválidos: " + campo + ".");
   return texto;
-}
-
-function textoSeguroPlanilha(valor) {
-  var texto = String(valor || "");
-  return /^[=+\-@]/.test(texto) ? "'" + texto : texto;
-}
-
-function removerPrefixoPlanilha(valor) {
-  var texto = String(valor || "");
-  return /^'[=+\-@]/.test(texto) ? texto.substring(1) : texto;
 }
 
 function mensagemPublica(erro) {

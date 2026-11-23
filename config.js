@@ -42,11 +42,11 @@ window.CONFIG_PADRAO = {
     voltasMinimas: 6
   },
   webhook: {
-    url: "https://script.google.com/macros/s/AKfycbztoFQ0_IT3JV5HJC8ixhmGbEyNi8Kt5oRZoNdkpuPkwOxTxvfytoW1wFkkQFDvVzWZ/exec"
+    url: "https://script.google.com/macros/s/AKfycby7kd3UAutZJKSMWHYBFf8Lj0o2xYxAammezuomd8pZPYhrx0FC9ClI2j37eGiGOgHa3Q/exec"
   },
   admin: {
     // Implantação separada do mesmo Apps Script, restrita a "Somente eu".
-    authUrl: "https://script.google.com/a/macros/koraxbrasil.com.br/s/AKfycbyoovD76EMFlmq8YAcRmTY2XZ2rf0RqrQAy-YlQqgnQME8VFJRvV5aEQmB3UEOCW6ce/exec"
+    authUrl: "https://script.google.com/a/macros/koraxbrasil.com.br/s/AKfycbwkV5dBWvu62Qsc9NmW2Hijc5mMfp5lwPvKcZ6qlwkY1tH0bSx47HpJrvVKIUXXwbjR_g/exec"
   },
   premios: [
     { id: "p1", nome: "Chocolate", cor: "#C9A227", categoria: "Brinde", descricao: "Um chocolate para adoçar o dia", positivo: true, som: "" },

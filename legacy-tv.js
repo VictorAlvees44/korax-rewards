@@ -2,7 +2,7 @@
   "use strict";
 
   var PUBLIC_BASE = "https://victoralvees44.github.io/korax-rewards/";
-  var BACKEND_PUBLICO = "https://script.google.com/macros/s/AKfycbztoFQ0_IT3JV5HJC8ixhmGbEyNi8Kt5oRZoNdkpuPkwOxTxvfytoW1wFkkQFDvVzWZ/exec";
+  var BACKEND_PUBLICO = "https://script.google.com/macros/s/AKfycby7kd3UAutZJKSMWHYBFf8Lj0o2xYxAammezuomd8pZPYhrx0FC9ClI2j37eGiGOgHa3Q/exec";
   var SOUND_URLS = {
     giro: PUBLIC_BASE + "assets/audio/roleta-girando.mp3",
     vitoria: PUBLIC_BASE + "assets/audio/palmas.mp3",

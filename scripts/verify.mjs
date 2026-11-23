@@ -56,8 +56,8 @@ for (const recurso of ["style.css", "legacy-tv.css", "config.js", "legacy-tv.js"
 if (!/acao === "perfisPublicos"/.test(gas) || !/acao === "perfilPublico"/.test(gas) || !/acao === "ultimoGiro"/.test(gas)) {
   throw new Error("O backend deve expor os perfis usados pelo menu público.");
 }
-if (!/var CABECALHO = \["Nome", "Data", "Prêmio"\]/.test(gas)) {
-  throw new Error("A planilha operacional deve registrar Nome, Data e Prêmio.");
+if (/SpreadsheetApp|appendRow|insertSheet/.test(gas)) {
+  throw new Error("O serviço de resultados por e-mail não deve acessar planilhas.");
 }
 
 const codigoCliente = arquivosJs.map((arquivo) => readFileSync(resolve(raiz, arquivo), "utf8")).join("\n");

@@ -33,17 +33,17 @@ Painel /admin ── login privado Google Workspace ──> sessão assinada (8 
 - Cada giro possui ID aleatório e um registro técnico temporário, sem o nome do participante, que impede resultados duplicados.
 - Se o backend falhar, nenhum resultado não oficial é exibido. A aplicação requer internet para girar.
 - A data registrada vem do servidor, no fuso `America/Sao_Paulo`.
-- Novos giros não alimentam a planilha. As abas antigas são preservadas como histórico e não são alteradas.
+- Os resultados são enviados por e-mail. O serviço independente não usa planilhas nem solicita permissão para acessá-las.
 - Alterar, salvar, listar ou excluir perfis exige uma sessão assinada pelo Apps Script depois do login privado com a única conta Workspace autorizada.
 - A chave de assinatura nunca sai das propriedades do Apps Script. O navegador recebe apenas um token temporário de oito horas, mantido no `sessionStorage` da aba.
 - O backend limita cada identificador de navegador a 20 giros por janela de cinco minutos. Esse limite reduz abuso acidental, mas não substitui CAPTCHA/WAF quando o link for divulgado em larga escala.
-- O painel valida a senha em uma chamada curta, carrega só o perfil ativo na entrada e busca a biblioteca completa apenas ao abrir **Perfis**. Lentidão na biblioteca não faz o login parecer inválido.
+- O painel valida a sessão corporativa em uma chamada curta, carrega só o perfil ativo na entrada e busca a biblioteca completa apenas ao abrir **Perfis**.
 - A tela remota recebe ID, perfil e prêmio por um evento temporário. O nome do participante não é transmitido para a Corporate Screen.
 - O evento enviado à Cloudflare usa HMAC-SHA-256. A chave compartilhada fica somente nas propriedades do Apps Script e nos segredos do Worker.
 
 ## Implantar o Google Apps Script
 
-1. Abra o projeto do Apps Script e acesse o editor.
+1. Crie um projeto independente em [Apps Script](https://script.google.com/home), sem vinculá-lo a uma planilha, e acesse o editor.
 2. Substitua `Code.gs` pelo conteúdo de `google-apps-script/Code.gs`.
 3. Ative a exibição do manifesto nas configurações do editor e substitua `appsscript.json` pelo arquivo do repositório.
 4. Em **Configurações do projeto → Propriedades do script**, mantenha:
@@ -136,7 +136,7 @@ O navegador do player deve permanecer aberto antes do giro. O player guarda o ú
 
 O sorteio responde antes de enviar e-mail. O navegador dispara uma segunda requisição assinada, e o Apps Script deduplica a notificação para não enviar duas vezes em uma repetição de rede. O e-mail contém nome, data e prêmio; esses dados não passam pela Cloudflare nem chegam às TVs.
 
-O controle técnico recente usa propriedades temporárias do Apps Script, sem o nome do participante. As planilhas e abas antigas não são apagadas nem modificadas automaticamente; permanecem disponíveis como histórico.
+O controle técnico recente usa propriedades temporárias do Apps Script, sem o nome do participante. A implantação é independente de Google Sheets; o código e o manifesto não usam a API nem o escopo de planilhas. Antes de apagar uma planilha que hospedava uma instalação antiga, migre o script para um projeto independente, publique e valide os novos links e arquive as implantações antigas. A pasta `RoletaCorp_Perfis` contém os perfis em uso e deve ser preservada.
 
 No navegador, o histórico local antigo é convertido para `Nome` e `Data` na primeira abertura após a atualização; o armazenamento antigo, que continha campos extras, é removido depois da conversão.
 

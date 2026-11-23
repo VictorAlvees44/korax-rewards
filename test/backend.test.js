@@ -273,23 +273,10 @@ test("e-mail assinado é enviado fora do sorteio e deduplicado", () => {
   assert.equal(envios, 1);
 });
 
-test("a planilha existente recebe a coluna Prêmio sem perder o cabeçalho atual", () => {
-  const ctx = backend();
-  const valores = [["Nome", "Data", ""]];
-  let peso = "";
-  const intervaloCabecalho = {
-    getValues: () => valores,
-    setValue: (valor) => { valores[0][2] = valor; return intervaloCabecalho; },
-    setFontWeight: (valor) => { peso = valor; return intervaloCabecalho; }
-  };
-  const aba = {
-    getLastRow: () => 3,
-    getRange: (...args) => args.length === 2 ? intervaloCabecalho : intervaloCabecalho
-  };
-
-  ctx.garantirCabecalhoAtual(aba);
-  assert.equal(valores[0][2], "Prêmio");
-  assert.equal(peso, "bold");
+test("o serviço independente não usa a API nem pede permissão de planilhas", () => {
+  assert.doesNotMatch(codigo, /SpreadsheetApp|appendRow|insertSheet/);
+  const manifesto = JSON.parse(readFileSync(new URL("../google-apps-script/appsscript.json", import.meta.url), "utf8"));
+  assert.ok(manifesto.oauthScopes.every((scope) => !scope.includes("spreadsheets")));
 });
 
 test("requisição repetida preserva resultado sem criar novo registro", () => {
