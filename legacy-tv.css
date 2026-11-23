@@ -20,8 +20,15 @@ html, body.modo-tela-legado { width: 100%; height: 100%; margin: 0; overflow: hi
 .modo-tela-legado .ponteiro { z-index: 5; top: -4px; left: 50%; margin-left: -20px; transform: none; -webkit-transform: none; border-top-color: #e8c766; }
 .modo-tela-legado .menu-perfis, .modo-tela-legado .perfil-selecionado { display: none; }
 .modo-tela-legado #btnTelaCheia { position: absolute; z-index: 8; display: block; top: 10px; right: 18px; width: auto; height: 34px; padding: 0 14px; border: 1px solid #c9a227; border-radius: 18px; background: #111827; color: #ffffff; font: bold 12px Arial, sans-serif; }
-.resultado-legado { position: fixed; z-index: 1000; display: none; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0,0,0,.78); text-align: center; }
-.resultado-legado__caixa { position: absolute; left: 20%; top: 22%; width: 60%; padding: 34px 20px; border: 2px solid #c9a227; border-radius: 18px; background: #0b1220; color: #fff; }
-.resultado-legado__selo { margin: 0 auto 18px; color: #e8c766; font: bold 70px Arial, sans-serif; }
-.resultado-legado__premio { color: #e8c766; font: bold 42px Arial, sans-serif; }
-.resultado-legado__descricao { margin-top: 14px; color: #fff; font: 22px Arial, sans-serif; }
+.resultado-legado { position: fixed; z-index: 1000; display: none; top: 0; right: 0; bottom: 0; left: 0; background: #06110e; background: radial-gradient(circle at center, #123c2d 0, #06110e 52%, #050913 100%); text-align: center; }
+.resultado-legado--negativo { background: #190b09; background: radial-gradient(circle at center, #4b2118 0, #190b09 52%, #050913 100%); }
+.resultado-legado__caixa { position: absolute; box-sizing: border-box; left: 12%; top: 10%; width: 76%; min-height: 72%; padding: 34px 34px 30px; border: 3px solid #57dca4; border-radius: 24px; background: #0b1820; background: linear-gradient(145deg, rgba(17,39,44,.98), rgba(7,12,22,.98)); color: #fff; box-shadow: 0 24px 80px rgba(0,0,0,.7); }
+.resultado-legado--negativo .resultado-legado__caixa { border-color: #f18b54; background: #21100f; background: linear-gradient(145deg, rgba(55,23,18,.98), rgba(7,12,22,.98)); }
+.resultado-legado__selo { width: 138px; height: 138px; margin: 0 auto 18px; border: 4px solid #fff; border-radius: 50%; background: #197c55; color: #fff; font: bold 92px/138px Arial, sans-serif; box-shadow: 0 0 58px rgba(48,205,139,.7); }
+.resultado-legado--negativo .resultado-legado__selo { background: #aa3d28; box-shadow: 0 0 58px rgba(226,99,54,.68); }
+.resultado-legado__kicker { display: inline-block; margin: 0 auto 12px; padding: 7px 16px; border: 1px solid #57dca4; border-radius: 18px; color: #d9ffef; font: bold 14px Arial, sans-serif; letter-spacing: 2px; }
+.resultado-legado--negativo .resultado-legado__kicker { border-color: #f18b54; color: #ffd7c2; }
+.resultado-legado__titulo { margin: 0 0 8px; color: #fff; font: bold 48px Arial, sans-serif; }
+.resultado-legado__premio { color: #f2d86f; font: bold 54px/1.08 Arial, sans-serif; text-shadow: 0 0 22px rgba(232,199,102,.45); }
+.resultado-legado--negativo .resultado-legado__premio { color: #ffb17c; text-shadow: 0 0 22px rgba(226,99,54,.4); }
+.resultado-legado__descricao { margin: 18px auto 0; max-width: 80%; color: #e5edf6; font: 24px/1.4 Arial, sans-serif; }

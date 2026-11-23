@@ -14,8 +14,8 @@
 <link rel="preconnect" href="https://victoralvees44.github.io">
 <link rel="dns-prefetch" href="https://script.googleusercontent.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Poppins:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://victoralvees44.github.io/korax-rewards/style.css?v=20261023-tv3">
-<link rel="stylesheet" href="https://victoralvees44.github.io/korax-rewards/legacy-tv.css?v=20261023-tv6">
+<link rel="stylesheet" href="https://victoralvees44.github.io/korax-rewards/style.css?v=20261123-result1">
+<link rel="stylesheet" href="https://victoralvees44.github.io/korax-rewards/legacy-tv.css?v=20261123-result1">
 </head>
 <body>
 
@@ -91,9 +91,12 @@
 </div>
 
 <!-- ======================= MODAL: RESULTADO ======================= -->
-<div id="modalResultado" class="modal oculto" role="dialog" aria-modal="true" aria-labelledby="modalResultadoTitulo">
+<div id="modalResultado" class="modal modal-resultado oculto" role="dialog" aria-modal="true" aria-labelledby="modalResultadoTitulo">
   <div class="modal__caixa modal__caixa--resultado">
-    <div id="resultadoSelo" class="resultado-selo"></div>
+    <div id="resultadoSelo" class="resultado-selo" aria-hidden="true">
+      <span id="resultadoIcone" class="resultado-icone">✓</span>
+    </div>
+    <p id="resultadoKicker" class="resultado-kicker">Resultado</p>
     <h2 id="modalResultadoTitulo">Resultado</h2>
     <p id="resultadoNome" class="resultado-nome"></p>
     <p id="resultadoPremio" class="resultado-premio"></p>
@@ -113,7 +116,7 @@
 <audio id="audioParada" preload="metadata"></audio>
 
 <script src="https://victoralvees44.github.io/korax-rewards/config.js?v=20261123-mail1"></script>
-<script src="https://victoralvees44.github.io/korax-rewards/legacy-tv.js?v=20261123-full1" defer></script>
-<script src="https://victoralvees44.github.io/korax-rewards/roleta-app.js?v=20261123-full1" type="module"></script>
+<script src="https://victoralvees44.github.io/korax-rewards/legacy-tv.js?v=20261123-result1" defer></script>
+<script src="https://victoralvees44.github.io/korax-rewards/roleta-app.js?v=20261123-result1" type="module"></script>
 </body>
 </html>

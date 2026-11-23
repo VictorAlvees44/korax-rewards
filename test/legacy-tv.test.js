@@ -6,6 +6,8 @@ import vm from "node:vm";
 const index = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const legacy = readFileSync(new URL("../legacy-tv.js", import.meta.url), "utf8");
 const moderno = readFileSync(new URL("../roleta-app.js", import.meta.url), "utf8");
+const estilos = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+const estilosLegados = readFileSync(new URL("../legacy-tv.css", import.meta.url), "utf8");
 
 function executarDeteccao({ userAgent = "Mozilla/5.0 Chrome/120", incorporado = false, referenciador = "", suportaModulos = true } = {}) {
   const listeners = [];
@@ -64,6 +66,21 @@ test("o receptor legado usa SVG e audios absolutos para o proxy da TV", () => {
   assert.doesNotMatch(legacy, /SCREEN_RECEPTION_MARGIN_MS/);
   assert.match(legacy, /CORPORATE_SCREEN_ROULETTE_WAKE/);
   assert.match(legacy, /window\.addEventListener\("message", receiveCorporateScreenWake/);
+});
+
+test("o resultado diferencia visualmente premios positivos e negativos nas TVs", () => {
+  assert.match(index, /id="resultadoKicker"/);
+  assert.match(index, /id="resultadoIcone"/);
+  assert.match(moderno, /resultado-positivo/);
+  assert.match(moderno, /resultado-negativo/);
+  assert.match(moderno, /PRÊMIO CONQUISTADO/);
+  assert.match(moderno, /NÃO FOI DESSA VEZ/);
+  assert.match(estilos, /\.resultado-positivo \.resultado-kicker/);
+  assert.match(estilos, /\.resultado-negativo \.resultado-premio/);
+  assert.match(legacy, /resultado-legado--positivo/);
+  assert.match(legacy, /resultado-legado--negativo/);
+  assert.match(legacy, /PR&Ecirc;MIO CONQUISTADO/);
+  assert.match(estilosLegados, /\.resultado-legado--negativo \.resultado-legado__selo/);
 });
 
 test("o giro avisa o Corporate Screen e mantém o polling como contingência", () => {

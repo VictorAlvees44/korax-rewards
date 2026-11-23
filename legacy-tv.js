@@ -483,12 +483,16 @@
       overlay = document.createElement("div");
       overlay.id = "resultadoLegado";
       overlay.className = "resultado-legado";
-      overlay.innerHTML = '<div class="resultado-legado__caixa"><div id="resultadoLegadoSelo" class="resultado-legado__selo">&#9733;</div><div id="resultadoLegadoPremio" class="resultado-legado__premio"></div><div id="resultadoLegadoDescricao" class="resultado-legado__descricao"></div></div>';
+      overlay.innerHTML = '<div class="resultado-legado__caixa"><div id="resultadoLegadoSelo" class="resultado-legado__selo">&#10003;</div><div id="resultadoLegadoKicker" class="resultado-legado__kicker"></div><div id="resultadoLegadoTitulo" class="resultado-legado__titulo"></div><div id="resultadoLegadoPremio" class="resultado-legado__premio"></div><div id="resultadoLegadoDescricao" class="resultado-legado__descricao"></div></div>';
       document.body.appendChild(overlay);
     }
-    byId("resultadoLegadoSelo").innerHTML = prize.positivo === false ? "..." : "&#9733;";
+    var positive = prize.positivo !== false;
+    overlay.className = "resultado-legado " + (positive ? "resultado-legado--positivo" : "resultado-legado--negativo");
+    byId("resultadoLegadoSelo").innerHTML = positive ? "&#10003;" : "&#8635;";
+    byId("resultadoLegadoKicker").innerHTML = positive ? "PR&Ecirc;MIO CONQUISTADO" : "TENTE NOVAMENTE";
+    byId("resultadoLegadoTitulo").innerHTML = positive ? "PARAB&Eacute;NS!" : "N&Atilde;O FOI DESSA VEZ";
     byId("resultadoLegadoPremio").innerHTML = escapeHtml(prize.nome || "Resultado");
-    byId("resultadoLegadoDescricao").innerHTML = escapeHtml(prize.descricao || "");
+    byId("resultadoLegadoDescricao").innerHTML = escapeHtml(prize.descricao || (positive ? "Aproveite o seu premio!" : "Uma nova chance vem por ai."));
     overlay.style.display = "block";
     window.clearTimeout(state.resultTimer);
     state.resultTimer = window.setTimeout(function () { overlay.style.display = "none"; }, 12000);

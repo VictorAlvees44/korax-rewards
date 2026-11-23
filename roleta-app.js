@@ -268,14 +268,21 @@ const ModalResultado = {
   },
   abrir(premio, nome = "") {
     clearTimeout(this.timer);
+    const positivo = premio.positivo !== false;
+    this.el.classList.remove("resultado-positivo", "resultado-negativo");
+    this.el.classList.add(positivo ? "resultado-positivo" : "resultado-negativo");
     const selo = document.getElementById("resultadoSelo");
-    selo.className = "resultado-selo " + (premio.positivo ? "positivo" : "negativo");
-    selo.textContent = premio.positivo ? "★" : "…";
+    selo.className = "resultado-selo " + (positivo ? "positivo" : "negativo");
+    document.getElementById("resultadoIcone").textContent = positivo ? "✓" : "↻";
+    document.getElementById("resultadoKicker").textContent = positivo ? "PRÊMIO CONQUISTADO" : "TENTE NOVAMENTE";
+    document.getElementById("modalResultadoTitulo").textContent = positivo ? "PARABÉNS!" : "NÃO FOI DESSA VEZ";
     const participante = document.getElementById("resultadoNome");
     participante.textContent = nome;
     participante.classList.toggle("oculto", !nome);
     document.getElementById("resultadoPremio").textContent = premio.nome;
-    document.getElementById("resultadoStatus").textContent = premio.descricao || "";
+    document.getElementById("resultadoStatus").textContent = premio.descricao || (positivo
+      ? "Aproveite o seu prêmio!"
+      : "Uma nova chance vem por aí.");
     this.el.classList.remove("oculto");
     if (MODO_TELA) this.timer = setTimeout(() => this.fechar(), 12000);
   },
