@@ -493,7 +493,10 @@
     byId("resultadoLegadoKicker").innerHTML = positive ? "PR&Ecirc;MIO CONQUISTADO" : "TENTE NOVAMENTE";
     byId("resultadoLegadoTitulo").innerHTML = positive ? "PARAB&Eacute;NS!" : "N&Atilde;O FOI DESSA VEZ";
     byId("resultadoLegadoPremio").innerHTML = escapeHtml(prize.nome || "Resultado");
-    byId("resultadoLegadoDescricao").innerHTML = escapeHtml(prize.descricao || (positive ? "Aproveite o seu premio!" : "Uma nova chance vem por ai."));
+    var description = prize.descricao || (positive ? "" : "Uma nova chance vem por ai.");
+    var descriptionNode = byId("resultadoLegadoDescricao");
+    descriptionNode.innerHTML = escapeHtml(description);
+    descriptionNode.style.display = description ? "block" : "none";
     overlay.style.display = "block";
     window.clearTimeout(state.resultTimer);
     state.resultTimer = window.setTimeout(function () {

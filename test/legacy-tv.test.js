@@ -81,6 +81,10 @@ test("o resultado diferencia visualmente premios positivos e negativos nas TVs",
   assert.match(legacy, /resultado-legado--negativo/);
   assert.match(legacy, /PR&Ecirc;MIO CONQUISTADO/);
   assert.match(estilosLegados, /\.resultado-legado--negativo \.resultado-legado__selo/);
+  assert.doesNotMatch(moderno, /Aproveite o seu prêmio/);
+  assert.doesNotMatch(legacy, /Aproveite o seu premio/);
+  assert.match(moderno, /status\.classList\.toggle\("oculto", !status\.textContent\)/);
+  assert.match(legacy, /descriptionNode\.style\.display = description \? "block" : "none"/);
 });
 
 test("a TV mantém o resultado visível antes de liberar o Corporate Screen", () => {

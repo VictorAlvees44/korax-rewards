@@ -280,9 +280,9 @@ const ModalResultado = {
     participante.textContent = nome;
     participante.classList.toggle("oculto", !nome);
     document.getElementById("resultadoPremio").textContent = premio.nome;
-    document.getElementById("resultadoStatus").textContent = premio.descricao || (positivo
-      ? "Aproveite o seu prêmio!"
-      : "Uma nova chance vem por aí.");
+    const status = document.getElementById("resultadoStatus");
+    status.textContent = premio.descricao || (positivo ? "" : "Uma nova chance vem por aí.");
+    status.classList.toggle("oculto", !status.textContent);
     this.el.classList.remove("oculto");
     if (MODO_TELA) this.timer = setTimeout(() => this.fechar(), 12000);
   },
